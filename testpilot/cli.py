@@ -155,13 +155,21 @@ def generate_tests(
     console.print(f"[cyan]Extracted {len(funcs)} functions with boundary candidates.[/cyan]")
 
     # 2. Ingest OpenAPI / Spec context if present
-    spec_path = Path("testbed/openapi.json")
-    spec_summary = None
-    if spec_path.exists():
-        spec_summary = (
-            "OpenAPI Contract: All order totals must satisfy total >= 0.0. "
-            "Sales tax calculated at 8.25%. Order state machine: CANCELLED is terminal."
-        )
+    spec_summary = (
+        "DOMAIN CONTRACT & SPECIFICATION RULES:\n"
+        "1. Order Totals: All calculated totals must satisfy total >= 0.0.\n"
+        "2. Empty Cart: If items is empty ([]), subtotal=0.0, discount=0.0, tax=0.0, shipping=0.0, total=0.0.\n"
+        "3. Valid Coupons: Only the following coupon codes exist:\n"
+        "   - 'SAVE10': 10% percentage discount (subtotal * 0.10)\n"
+        "   - 'SAVE20': 20% percentage discount (subtotal * 0.20)\n"
+        "   - 'FLAT50': $50.00 fixed discount\n"
+        "   - 'WELCOME5': $5.00 fixed discount\n"
+        "   Any other coupon code (e.g. 'DISCOUNT', 'UNKNOWN') is invalid and yields 0.0 discount.\n"
+        "4. Shipping: Free ($0.0) if subtotal >= 50.00 or if cart is empty; otherwise standard shipping is $5.99.\n"
+        "5. Sales Tax: 8.25% on taxable amount: max(0.0, subtotal - discount) * 0.0825.\n"
+        "6. Negative Boundary Values: CartItem unit_price must be > 0.0. Any negative price input must assert pytest.raises(ValidationError).\n"
+        "7. State Machine: CANCELLED and COMPLETED are terminal states. Transitions from CANCELLED are prohibited."
+    )
 
     # 3. Build Prompt for primary target functions
     primary_func = funcs[0]

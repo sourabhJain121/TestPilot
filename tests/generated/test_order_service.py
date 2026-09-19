@@ -5,47 +5,87 @@ Spec-as-Oracle Grounded Assertions targeting edge cases and boundary limits.
 """
 
 import pytest
+from pydantic import ValidationError
 from testbed.app.models import CartItem, OrderStatus, OrderTotals
-from testbed.app.services.order_service import OrderService, VALID_COUPONS
+from testbed.app.services.order_service import (
+    FREE_SHIPPING_THRESHOLD,
+    STANDARD_SHIPPING_FEE,
+    TAX_RATE,
+    VALID_COUPONS,
+    OrderService,
+)
 
-# Reasoning Trace Summary: The function `calculate_order_totals` has several boundary conditions that need to be thoroughly tested to ensure the implementation adheres to the sp...
+# Reasoning Trace Summary: The function `calculate_order_totals` is being analyzed using the Boundary Value Analysis (BVA) technique. The goal is to ensure that the function beh...
 
 def test_empty_cart():
-    from testbed.app.services.order_service import OrderService, CartItem, OrderTotals
-    result = OrderService.calculate_order_totals(items=[], coupon_code='SAVE10')
-    assert result == OrderTotals(subtotal=0.0, discount=0.0, tax=0.0, shipping=0.0, total=0.0)
+    from testbed.app.services.order_service import OrderService, CartItem
+    items = []
+    coupon_code = 'SAVE10'
+    result = OrderService.calculate_order_totals(items, coupon_code)
+    assert result.subtotal == 0.0
+    assert result.discount == 0.0
+    assert result.tax == 0.0
+    assert result.shipping == 0.0
+    assert result.total == 0.0
 
-def test_zero_subtotal():
-    from testbed.app.services.order_service import OrderService, CartItem, OrderTotals
-    result = OrderService.calculate_order_totals(items=[ {'price': 0.0, 'quantity': 1} ], coupon_code='SAVE10')
-    assert result == OrderTotals(subtotal=0.0, discount=0.0, tax=0.0, shipping=0.0, total=0.0)
+def test_subtotal_below_free_shipping_threshold():
+    from testbed.app.services.order_service import OrderService, CartItem
+    items = [CartItem(unit_price=49.99, quantity=1)]
+    coupon_code = 'SAVE10'
+    result = OrderService.calculate_order_totals(items, coupon_code)
+    assert result.subtotal == 49.99
+    assert result.discount == 4.999
+    assert result.tax == 3.75
+    assert result.shipping == 5.99
+    assert result.total == 59.74
 
-def test_negative_subtotal():
-    from testbed.app.services.order_service import OrderService, CartItem, OrderTotals
-    result = OrderService.calculate_order_totals(items=[ {'price': -1.0, 'quantity': 1} ], coupon_code='SAVE10')
-    assert result == OrderTotals(subtotal=0.0, discount=0.0, tax=0.0, shipping=0.0, total=0.0)
+def test_subtotal_at_free_shipping_threshold():
+    from testbed.app.services.order_service import OrderService, CartItem
+    items = [CartItem(unit_price=50.00, quantity=1)]
+    coupon_code = 'SAVE10'
+    result = OrderService.calculate_order_totals(items, coupon_code)
+    assert result.subtotal == 50.00
+    assert result.discount == 5.00
+    assert result.tax == 3.75
+    assert result.shipping == 0.0
+    assert result.total == 53.75
 
-def test_valid_coupon_code():
-    from testbed.app.services.order_service import OrderService, CartItem, OrderTotals
-    result = OrderService.calculate_order_totals(items=[ {'price': 100.0, 'quantity': 1} ], coupon_code='SAVE10')
-    assert result == OrderTotals(subtotal=100.0, discount=10.0, tax=7.25, shipping=5.99, total=92.24)
+def test_subtotal_above_free_shipping_threshold():
+    from testbed.app.services.order_service import OrderService, CartItem
+    items = [CartItem(unit_price=50.01, quantity=1)]
+    coupon_code = 'SAVE10'
+    result = OrderService.calculate_order_totals(items, coupon_code)
+    assert result.subtotal == 50.01
+    assert result.discount == 5.001
+    assert result.tax == 3.75
+    assert result.shipping == 0.0
+    assert result.total == 53.76
 
-def test_invalid_coupon_code():
-    from testbed.app.services.order_service import OrderService, CartItem, OrderTotals
-    result = OrderService.calculate_order_totals(items=[ {'price': 100.0, 'quantity': 1} ], coupon_code='DISCOUNT')
-    assert result == OrderTotals(subtotal=100.0, discount=0.0, tax=8.25, shipping=5.99, total=114.24)
+def test_valid_coupon_codes():
+    from testbed.app.services.order_service import OrderService, CartItem
+    items = [CartItem(unit_price=100.00, quantity=1)]
+    coupon_code = 'SAVE20'
+    result = OrderService.calculate_order_totals(items, coupon_code)
+    assert result.subtotal == 100.00
+    assert result.discount == 20.00
+    assert result.tax == 6.60
+    assert result.shipping == 0.0
+    assert result.total == 86.60
 
-def test_free_shipping():
-    from testbed.app.services.order_service import OrderService, CartItem, OrderTotals
-    result = OrderService.calculate_order_totals(items=[ {'price': 50.0, 'quantity': 1} ], coupon_code='SAVE10')
-    assert result == OrderTotals(subtotal=50.0, discount=5.0, tax=3.81, shipping=0.0, total=48.81)
+def test_invalid_coupon_codes():
+    from testbed.app.services.order_service import OrderService, CartItem
+    items = [CartItem(unit_price=100.00, quantity=1)]
+    coupon_code = 'INVALID'
+    result = OrderService.calculate_order_totals(items, coupon_code)
+    assert result.subtotal == 100.00
+    assert result.discount == 0.0
+    assert result.tax == 8.25
+    assert result.shipping == 0.0
+    assert result.total == 108.25
 
-def test_standard_shipping():
-    from testbed.app.services.order_service import OrderService, CartItem, OrderTotals
-    result = OrderService.calculate_order_totals(items=[ {'price': 49.0, 'quantity': 1} ], coupon_code='SAVE10')
-    assert result == OrderTotals(subtotal=49.0, discount=4.9, tax=3.74, shipping=5.99, total=58.73)
-
-def test_sales_tax():
-    from testbed.app.services.order_service import OrderService, CartItem, OrderTotals
-    result = OrderService.calculate_order_totals(items=[ {'price': 100.0, 'quantity': 1} ], coupon_code='SAVE10')
-    assert result == OrderTotals(subtotal=100.0, discount=10.0, tax=7.25, shipping=5.99, total=92.24)
+def test_negative_price():
+    from testbed.app.services.order_service import OrderService, CartItem
+    items = [CartItem(unit_price=-1.00, quantity=1)]
+    coupon_code = 'SAVE10'
+    with pytest.raises(ValidationError):
+        OrderService.calculate_order_totals(items, coupon_code)

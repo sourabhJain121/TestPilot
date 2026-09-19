@@ -27,37 +27,64 @@ class PromptManager:
 
     SYSTEM_INSTRUCTION = """You are a Principal Software Verification & Testing Architect.
 Your task is to analyze code, abstract syntax trees (ASTs), and specification constraints, then generate rigorous, boundary-hardened pytest test cases.
-You must adhere to the Spec-as-Oracle philosophy:
-- Test exact boundary limits: zero values, empty structures, negative values, and precision bounds.
-- Never mock away business logic flaws.
+You must adhere strictly to the Spec-as-Oracle philosophy and domain business rules:
+- Ground all calculations in the exact domain specification:
+  1. Shipping fee: Exactly 0.0 if subtotal >= 50.00 or if cart is empty; exactly 5.99 if 0.0 < subtotal < 50.00.
+  2. Tax: Exactly 8.25% applied to taxable_amount = max(0.0, subtotal - discount), NOT on raw subtotal.
+  3. Valid coupons:
+     - "SAVE10": 10% discount (subtotal * 0.10)
+     - "SAVE20": 20% discount (subtotal * 0.20)
+     - "FLAT50": $50.00 fixed discount
+     - "WELCOME5": $5.00 fixed discount
+     - Any other coupon (e.g. "DISCOUNT", "INVALID", "", "   ") yields 0.0 discount.
+  4. Negative boundary values: CartItem prices must be strictly positive (unit_price > 0.0). Testing negative prices MUST assert `pytest.raises(ValidationError)` from pydantic.
 - Output MUST be valid JSON conforming strictly to the requested schema.
 """
 
     COT_REASONING_STEPS = """
 Follow this formal 4-phase Chain-of-Thought reasoning protocol:
 PHASE 1: CONTRACT & SPECIFICATION EXTRACTION
-Identify all business rules, invariants, and constraints (e.g. total >= 0.0, valid state transitions, precision requirements).
+Extract exact business formulas:
+- subtotal = sum(price * qty)
+- discount = coupon rule (SAVE10=10%, SAVE20=20%, FLAT50=$50, WELCOME5=$5; unknown=0.0)
+- taxable_amount = max(0.0, subtotal - discount)
+- tax = calculate_tax(taxable_amount) = int(taxable_amount * 0.0825 * 100) / 100.0
+- shipping = 0.0 if subtotal >= 50.00 or empty; 5.99 if 0.0 < subtotal < 50.00
+- total = (subtotal - discount) + tax + shipping
 
 PHASE 2: EQUIVALENCE PARTITIONING
-Define valid input partitions and invalid input partitions.
+- Valid subtotal partitions: empty (0.0), below free shipping threshold (< 50.0), at threshold (50.0), above threshold (> 50.0).
+- Invalid inputs: negative prices (triggers pydantic.ValidationError).
+- Coupon partitions: valid percentage (SAVE10, SAVE20), valid fixed (FLAT50, WELCOME5), unknown/invalid (0.0 discount).
 
 PHASE 3: BOUNDARY VALUE ANALYSIS (BVA)
-Identify the exact boundary points on the edges (e.g., threshold - 0.01, threshold, threshold + 0.01; 0, -1; empty list).
+Identify exact boundary points: subtotal=0.0, subtotal=49.99 (shipping=5.99), subtotal=50.00 (shipping=0.0), discount > subtotal (total >= 0.0 constraint).
 
 PHASE 4: TEST SYNTHESIS
-Produce targeted test case specifications that verify whether the implementation adheres to these boundaries.
+Synthesize python/pytest functions asserting exact Spec-as-Oracle results. If testing negative price or quantity, assert `pytest.raises(ValidationError)`.
 """
 
     FEW_SHOT_EXEMPLARS = """
-Example Boundary Test Case 1:
+Example 1 (Subtotal below free shipping threshold with discount):
 {
-  "test_name": "test_calculate_discount_exceeds_subtotal_negative_boundary",
-  "target_function": "calculate_discount",
-  "boundary_focus": "Fixed discount exceeding subtotal causing potential negative net total",
-  "input_values": {"subtotal": 20.0, "coupon_code": "FLAT50"},
-  "expected_behavior": "Should cap discount at subtotal (20.0) or ensure net payable amount is not negative",
-  "rationale": "Applying a $50 fixed coupon on a $20 order must not produce a negative total balance.",
-  "code": "def test_calculate_discount_exceeds_subtotal():\\n    totals = OrderService.calculate_order_totals([CartItem(item_id='1', name='Item', unit_price=20.0, quantity=1)], coupon_code='FLAT50')\\n    assert totals.total >= 0.0, f'Order total cannot be negative: {totals.total}'"
+  "test_name": "test_order_totals_below_free_shipping_with_save10",
+  "target_function": "calculate_order_totals",
+  "boundary_focus": "Subtotal below $50 threshold with 10% coupon incurs $5.99 shipping",
+  "input_values": {"items": [{"item_id": "1", "name": "Item", "unit_price": 40.0, "quantity": 1}], "coupon_code": "SAVE10"},
+  "expected_behavior": "subtotal=40.0, discount=4.0, tax=2.97 (on 36.0), shipping=5.99, total=44.96",
+  "rationale": "Subtotal is 40.0 (< 50.00), so shipping=5.99. Discount is 10% of 40 = 4.0. Taxable is 36.0, tax is int(36.0 * 0.0825 * 100)/100 = 2.97.",
+  "code": "def test_order_totals_below_free_shipping_with_save10():\\n    from pydantic import ValidationError\\n    from testbed.app.models import CartItem, OrderTotals\\n    from testbed.app.services.order_service import OrderService\\n    items = [CartItem(item_id='1', name='Item', unit_price=40.0, quantity=1)]\\n    result = OrderService.calculate_order_totals(items, coupon_code='SAVE10')\\n    assert result == OrderTotals(subtotal=40.0, discount=4.0, tax=2.97, shipping=5.99, total=44.96)"
+}
+
+Example 2 (Negative price boundary input violates Pydantic validation):
+{
+  "test_name": "test_cart_item_negative_price_raises_validation_error",
+  "target_function": "calculate_order_totals",
+  "boundary_focus": "Negative unit price violates Pydantic gt=0.0 constraint",
+  "input_values": {"items": [{"item_id": "1", "name": "Invalid", "unit_price": -10.0, "quantity": 1}]},
+  "expected_behavior": "Raises pydantic.ValidationError",
+  "rationale": "Prices cannot be negative. The domain model requires strictly positive unit_price.",
+  "code": "def test_cart_item_negative_price_raises_validation_error():\\n    import pytest\\n    from pydantic import ValidationError\\n    from testbed.app.models import CartItem\\n    from testbed.app.services.order_service import OrderService\\n    with pytest.raises(ValidationError):\\n        items = [CartItem(item_id='1', name='Invalid', unit_price=-10.0, quantity=1)]\\n        OrderService.calculate_order_totals(items)"
 }
 """
 

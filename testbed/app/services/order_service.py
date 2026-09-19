@@ -14,6 +14,7 @@ STANDARD_SHIPPING_FEE = 5.99
 
 VALID_COUPONS = {
     "SAVE10": {"type": "percentage", "value": 0.10},
+    "SAVE20": {"type": "percentage", "value": 0.20},
     "FLAT50": {"type": "fixed", "value": 50.00},
     "WELCOME5": {"type": "fixed", "value": 5.00},
 }
@@ -29,7 +30,7 @@ class OrderService:
         for item in items:
             if isinstance(item, dict):
                 price = item.get("unit_price", item.get("price", 0.0))
-                qty = item.get("quantity", 1)
+                qty = item.get("quantity", item.get("qty", 1))
             else:
                 price = item.unit_price
                 qty = item.quantity
