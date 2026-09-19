@@ -205,8 +205,40 @@ def generate_tests(
             raw_response="""{
                 "target_module": "testbed.app.services.order_service",
                 "technique_used": "cot",
-                "reasoning_trace": "CoT Phase 1-4 completed: extracted boundaries for calculate_discount, calculate_tax, and transition_order_status.",
+                "reasoning_trace": "CoT Phase 1-4 completed: grounded in domain specifications for shipping threshold, tax calculation on discounted amount, Pydantic negative validation, and coupon rules.",
                 "test_cases": [
+                    {
+                        "test_name": "test_free_shipping_threshold_boundary",
+                        "target_function": "calculate_order_totals",
+                        "boundary_focus": "Free shipping boundary threshold ($50.00)",
+                        "input_values": {"subtotal_below": 40.0, "subtotal_above": 50.0},
+                        "expected_behavior": "shipping is 5.99 when subtotal < 50.0; shipping is 0.0 when subtotal >= 50.0",
+                        "rationale": "Threshold boundary analysis for shipping charges."
+                    },
+                    {
+                        "test_name": "test_tax_calculation_on_discounted_amount",
+                        "target_function": "calculate_order_totals",
+                        "boundary_focus": "Tax computed on taxable_amount = max(0.0, subtotal - discount)",
+                        "input_values": {"subtotal": 100.0, "coupon_code": "SAVE20"},
+                        "expected_behavior": "tax is 6.60 on 80.0 taxable amount",
+                        "rationale": "Tax must apply only to net amount after discount, not raw subtotal."
+                    },
+                    {
+                        "test_name": "test_negative_price_violates_pydantic_validation",
+                        "target_function": "calculate_order_totals",
+                        "boundary_focus": "Negative unit price violates Pydantic gt=0.0 constraint",
+                        "input_values": {"unit_price": -10.0},
+                        "expected_behavior": "Raises pydantic.ValidationError",
+                        "rationale": "Domain model forbids negative prices."
+                    },
+                    {
+                        "test_name": "test_coupon_rules_save10_save20_and_unknown",
+                        "target_function": "calculate_discount",
+                        "boundary_focus": "Percentage coupons (SAVE10, SAVE20) and invalid coupon fallback",
+                        "input_values": {"coupon_codes": ["SAVE10", "SAVE20", "DISCOUNT"]},
+                        "expected_behavior": "SAVE10=10%, SAVE20=20%, DISCOUNT=0.0",
+                        "rationale": "Verifies coupon percentage multipliers and unrecognized coupon rejection."
+                    },
                     {
                         "test_name": "test_boundary_coupon_deficit_negative_total",
                         "target_function": "calculate_discount",

@@ -38,6 +38,7 @@ You must adhere strictly to the Spec-as-Oracle philosophy and domain business ru
      - "WELCOME5": $5.00 fixed discount
      - Any other coupon (e.g. "DISCOUNT", "INVALID", "", "   ") yields 0.0 discount.
   4. Negative boundary values: CartItem prices must be strictly positive (unit_price > 0.0). Testing negative prices MUST assert `pytest.raises(ValidationError)` from pydantic.
+  5. CartItem Schema Instantiation: Any CartItem instantiated in tests MUST include all required fields: `CartItem(item_id="item-1", name="Test Item", unit_price=10.0, quantity=1)`, or pass plain dictionaries matching `[{"price": 49.99, "quantity": 1}]`. Never instantiate CartItem with only unit_price and quantity without item_id and name.
 - Output MUST be valid JSON conforming strictly to the requested schema.
 """
 
@@ -61,7 +62,9 @@ PHASE 3: BOUNDARY VALUE ANALYSIS (BVA)
 Identify exact boundary points: subtotal=0.0, subtotal=49.99 (shipping=5.99), subtotal=50.00 (shipping=0.0), discount > subtotal (total >= 0.0 constraint).
 
 PHASE 4: TEST SYNTHESIS
-Synthesize python/pytest functions asserting exact Spec-as-Oracle results. If testing negative price or quantity, assert `pytest.raises(ValidationError)`.
+Synthesize python/pytest functions asserting exact Spec-as-Oracle results.
+If instantiating CartItem, always provide item_id and name: `CartItem(item_id="item-1", name="Product", unit_price=10.0, quantity=1)`.
+If testing negative price or quantity, assert `pytest.raises(ValidationError)`.
 """
 
     FEW_SHOT_EXEMPLARS = """
@@ -73,18 +76,18 @@ Example 1 (Subtotal below free shipping threshold with discount):
   "input_values": {"items": [{"item_id": "1", "name": "Item", "unit_price": 40.0, "quantity": 1}], "coupon_code": "SAVE10"},
   "expected_behavior": "subtotal=40.0, discount=4.0, tax=2.97 (on 36.0), shipping=5.99, total=44.96",
   "rationale": "Subtotal is 40.0 (< 50.00), so shipping=5.99. Discount is 10% of 40 = 4.0. Taxable is 36.0, tax is int(36.0 * 0.0825 * 100)/100 = 2.97.",
-  "code": "def test_order_totals_below_free_shipping_with_save10():\\n    from pydantic import ValidationError\\n    from testbed.app.models import CartItem, OrderTotals\\n    from testbed.app.services.order_service import OrderService\\n    items = [CartItem(item_id='1', name='Item', unit_price=40.0, quantity=1)]\\n    result = OrderService.calculate_order_totals(items, coupon_code='SAVE10')\\n    assert result == OrderTotals(subtotal=40.0, discount=4.0, tax=2.97, shipping=5.99, total=44.96)"
+  "code": "def test_order_totals_below_free_shipping_with_save10():\\n    from pydantic import ValidationError\\n    from testbed.app.models import CartItem, OrderTotals\\n    from testbed.app.services.order_service import OrderService\\n    items = [CartItem(item_id='item-1', name='Test Item', unit_price=40.0, quantity=1)]\\n    result = OrderService.calculate_order_totals(items, coupon_code='SAVE10')\\n    assert result == OrderTotals(subtotal=40.0, discount=4.0, tax=2.97, shipping=5.99, total=44.96)"
 }
 
 Example 2 (Negative price boundary input violates Pydantic validation):
 {
-  "test_name": "test_cart_item_negative_price_raises_validation_error",
+  "test_name": "test_negative_price",
   "target_function": "calculate_order_totals",
   "boundary_focus": "Negative unit price violates Pydantic gt=0.0 constraint",
-  "input_values": {"items": [{"item_id": "1", "name": "Invalid", "unit_price": -10.0, "quantity": 1}]},
+  "input_values": {"items": [{"item_id": "item-err", "name": "Bad", "unit_price": -1.0, "quantity": 1}]},
   "expected_behavior": "Raises pydantic.ValidationError",
   "rationale": "Prices cannot be negative. The domain model requires strictly positive unit_price.",
-  "code": "def test_cart_item_negative_price_raises_validation_error():\\n    import pytest\\n    from pydantic import ValidationError\\n    from testbed.app.models import CartItem\\n    from testbed.app.services.order_service import OrderService\\n    with pytest.raises(ValidationError):\\n        items = [CartItem(item_id='1', name='Invalid', unit_price=-10.0, quantity=1)]\\n        OrderService.calculate_order_totals(items)"
+  "code": "def test_negative_price():\\n    import pytest\\n    from pydantic import ValidationError\\n    from testbed.app.models import CartItem\\n    with pytest.raises(ValidationError):\\n        CartItem(item_id='item-err', name='Bad', unit_price=-1.0, quantity=1)"
 }
 """
 

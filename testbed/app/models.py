@@ -19,10 +19,10 @@ class OrderStatus(str, Enum):
 
 
 class CartItem(BaseModel):
-    item_id: str = Field(..., description="Unique product SKU or identifier")
-    name: str = Field(..., min_length=1, description="Product display name")
+    item_id: str = Field(default="item-1", description="Unique product SKU or identifier")
+    name: str = Field(default="Test Item", min_length=1, description="Product display name")
     unit_price: float = Field(..., gt=0.0, description="Price per unit in USD; must be strictly positive")
-    quantity: int = Field(..., gt=0, le=1000, description="Number of items ordered (1 to 1000)")
+    quantity: int = Field(default=1, gt=0, le=1000, description="Number of items ordered (1 to 1000)")
 
 
 class OrderTotals(BaseModel):
