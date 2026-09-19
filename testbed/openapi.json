@@ -1,0 +1,539 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Testbed E-Commerce API",
+    "description": "Modular microservice used as the target testing ground for TestPilot AI.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/cart/items/subtotal": {
+      "post": {
+        "tags": [
+          "Cart"
+        ],
+        "summary": "Calculate Subtotal",
+        "description": "Calculate raw subtotal for a list of items.",
+        "operationId": "calculate_subtotal_cart_items_subtotal_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/CartItem"
+                },
+                "type": "array",
+                "title": "Items"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "number"
+                  },
+                  "type": "object",
+                  "title": "Response Calculate Subtotal Cart Items Subtotal Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/apply-coupon": {
+      "post": {
+        "tags": [
+          "Promotions"
+        ],
+        "summary": "Apply Coupon",
+        "description": "Validate coupon and calculate applicable discount amount.",
+        "operationId": "apply_coupon_orders_apply_coupon_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CouponApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouponApplyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/checkout": {
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Create Order",
+        "description": "Calculate order totals and initialize a new pending order.\nEnforces that final total must never be negative.",
+        "operationId": "create_order_orders_checkout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/transition-status": {
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Transition Order Status",
+        "description": "Execute a lifecycle status transition for an order.",
+        "operationId": "transition_order_status_orders_transition_status_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusTransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusTransitionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CartItem": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "title": "Item Id",
+            "description": "Unique product SKU or identifier"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name",
+            "description": "Product display name"
+          },
+          "unit_price": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Unit Price",
+            "description": "Price per unit in USD; must be strictly positive"
+          },
+          "quantity": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "description": "Number of items ordered (1 to 1000)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "name",
+          "unit_price",
+          "quantity"
+        ],
+        "title": "CartItem"
+      },
+      "CouponApplyRequest": {
+        "properties": {
+          "coupon_code": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Coupon Code",
+            "description": "Promotional code"
+          },
+          "subtotal": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Subtotal",
+            "description": "Cart subtotal before discount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coupon_code",
+          "subtotal"
+        ],
+        "title": "CouponApplyRequest"
+      },
+      "CouponApplyResponse": {
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "title": "Valid",
+            "description": "Whether the coupon is accepted"
+          },
+          "discount_amount": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Discount Amount",
+            "description": "Discount value in dollars",
+            "default": 0.0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Explanation or rejection reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valid",
+          "message"
+        ],
+        "title": "CouponApplyResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "OrderRequest": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 3,
+            "title": "Customer Id",
+            "description": "Customer account ID"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CartItem"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Items",
+            "description": "List of items in the cart"
+          },
+          "shipping_address": {
+            "type": "string",
+            "minLength": 5,
+            "title": "Shipping Address",
+            "description": "Physical shipping address"
+          },
+          "coupon_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coupon Code",
+            "description": "Optional promotional discount code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "items",
+          "shipping_address"
+        ],
+        "title": "OrderRequest"
+      },
+      "OrderResponse": {
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "title": "Order Id",
+            "description": "Generated UUID for the order"
+          },
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id",
+            "description": "Customer account ID"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrderStatus",
+            "description": "Current lifecycle status",
+            "default": "PENDING"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CartItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Items included in the order"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/OrderTotals",
+            "description": "Detailed breakdown of costs"
+          },
+          "coupon_applied": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coupon Applied",
+            "description": "Applied coupon code if valid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_id",
+          "customer_id",
+          "items",
+          "totals"
+        ],
+        "title": "OrderResponse"
+      },
+      "OrderStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "PAID",
+          "SHIPPED",
+          "DELIVERED",
+          "CANCELLED",
+          "COMPLETED"
+        ],
+        "title": "OrderStatus"
+      },
+      "OrderTotals": {
+        "properties": {
+          "subtotal": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Subtotal",
+            "description": "Sum of item prices before discount and tax"
+          },
+          "discount": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Discount",
+            "description": "Discount amount applied",
+            "default": 0.0
+          },
+          "tax": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Tax",
+            "description": "Calculated sales tax"
+          },
+          "shipping": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Shipping",
+            "description": "Shipping fee",
+            "default": 0.0
+          },
+          "total": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Total",
+            "description": "Final payable amount; must never be negative"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subtotal",
+          "tax",
+          "total"
+        ],
+        "title": "OrderTotals"
+      },
+      "StatusTransitionRequest": {
+        "properties": {
+          "current_status": {
+            "$ref": "#/components/schemas/OrderStatus",
+            "description": "Current status of the order"
+          },
+          "new_status": {
+            "$ref": "#/components/schemas/OrderStatus",
+            "description": "Requested new status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Optional audit log explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current_status",
+          "new_status"
+        ],
+        "title": "StatusTransitionRequest"
+      },
+      "StatusTransitionResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the transition was permitted"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrderStatus",
+            "description": "Resulting order status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if transition was rejected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "status"
+        ],
+        "title": "StatusTransitionResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
