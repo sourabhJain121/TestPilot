@@ -1,0 +1,7 @@
+templates:
+  boundary_discovery:
+    role: "Staff QA Engineer"
+    instruction: |
+      Analyze the given Python AST function and OpenAPI specification.
+      Generate strict Pytest assertions for boundary conditions, 0-values, and max thresholds.
+      Return output adhering strictly to JSON.
