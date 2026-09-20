@@ -4,6 +4,7 @@ Persists and indexes semantic specification chunks from OpenAPI and Markdown doc
 Uses local SentenceTransformer embeddings with deduplication and similarity search.
 """
 
+import warnings
 from pathlib import Path
 from typing import Any, Optional
 
@@ -11,6 +12,9 @@ import chromadb
 from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
 
 from testpilot.rag.parser import SpecChunk, SpecParser
+
+# Suppress non-blocking deprecation warnings from third-party ChromaDB/OpenTelemetry libraries
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
@@ -24,6 +28,10 @@ class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
         except Exception:
             self._has_model = False
             self.model = None
+
+    def name(self) -> str:
+        """Return the unique name identifier required by ChromaDB EmbeddingFunction."""
+        return "sentence-transformers/all-MiniLM-L6-v2"
 
     def __call__(self, input: Documents) -> Embeddings:
         if self._has_model and self.model:

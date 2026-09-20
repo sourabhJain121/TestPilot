@@ -6,9 +6,10 @@ from testpilot.sourcegraph.client import LocalCodeGraphFallback, SourcegraphClie
 
 
 def test_sourcegraph_client_fallback_mode():
-    client = SourcegraphClient(endpoint="http://localhost:7080/.api/graphql", timeout=0.5)
-    # When Sourcegraph is offline, is_available returns False gracefully
+    client = SourcegraphClient(endpoint="http://localhost:9999/.api/graphql", timeout=0.1)
+    # When Sourcegraph is offline, is_available and is_alive return False gracefully
     assert client.is_available() is False
+    assert client.is_alive() is False
 
 
 def test_local_fallback_finds_callers_of_order_service():

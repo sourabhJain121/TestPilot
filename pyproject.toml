@@ -35,3 +35,9 @@ testpilot = "testpilot.cli:app"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["testpilot*", "testbed*"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]

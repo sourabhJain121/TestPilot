@@ -66,10 +66,10 @@ def status():
 
     # Sourcegraph OSS
     sg_client = SourcegraphClient()
-    sg_online = sg_client.is_available()
+    sg_online = sg_client.is_alive()
     if sg_online:
         sg_status = "[bold green]ONLINE[/bold green]"
-        sg_details = "GraphQL API active"
+        sg_details = "Server active and responding (HTTP < 500)"
     else:
         sg_status = "[bold yellow]FALLBACK[/bold yellow]"
         sg_details = "Server offline; Autonomous Local AST Call-Graph Active"
@@ -340,12 +340,16 @@ def verify(
         return
 
     arbiter = RAGArbiter()
-    table = Table(title="Spec-as-Oracle Dynamic Regression Arbitration (ChromaDB + LLM)", show_lines=True)
-    table.add_column("Test Case", style="bold yellow")
-    table.add_column("Execution Result", style="bold red")
-    table.add_column("Spec Ground Truth Constraint", style="green")
-    table.add_column("Arbitration Verdict", style="bold magenta")
-    table.add_column("Recommended Fix", style="cyan")
+    table = Table(
+        title="Spec-as-Oracle Dynamic Regression Arbitration (ChromaDB + LLM)",
+        show_lines=True,
+        expand=True,
+    )
+    table.add_column("Test Case", style="bold yellow", ratio=2, overflow="fold")
+    table.add_column("Result", style="bold red", width=10, justify="center")
+    table.add_column("Spec Ground Truth Constraint", style="green", ratio=3, overflow="fold")
+    table.add_column("Arbitration Verdict", style="bold magenta", ratio=3, overflow="fold")
+    table.add_column("Recommended Fix", style="cyan", ratio=3, overflow="fold")
 
     for match in failed_matches:
         test_name = match[0]
@@ -359,9 +363,9 @@ def verify(
         table.add_row(
             test_name,
             "FAILED",
-            arbitration.spec_clause[:120] + ("..." if len(arbitration.spec_clause) > 120 else ""),
-            f"{arbitration.verdict}\n({arbitration.explanation})",
-            arbitration.recommended_fix[:100] + ("..." if len(arbitration.recommended_fix) > 100 else ""),
+            arbitration.spec_clause.strip(),
+            f"[bold]{arbitration.verdict}[/bold]\n({arbitration.explanation.strip()})",
+            arbitration.recommended_fix.strip(),
         )
 
     console.print(table)

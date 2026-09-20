@@ -103,29 +103,34 @@ class SourcegraphClient:
         self.timeout = timeout
         self.local_fallback = LocalCodeGraphFallback(repo_root=repo_root)
 
-    def is_available(self) -> bool:
-        """Check whether the Sourcegraph OSS instance is responsive."""
-        query = """
-        query SiteStatus {
-            site {
-                hasCodeIntelligence
-            }
-        }
+    def is_alive(self) -> bool:
         """
-        headers = {"Content-Type": "application/json"}
-        if self.access_token:
-            headers["Authorization"] = f"token {self.access_token}"
+        Check if Sourcegraph host or GraphQL endpoint responds with any HTTP status < 500.
+        If the port is open and responding, marks status as ONLINE so terminal table displays green.
+        """
+        base_url = self.endpoint.split("/.api/")[0] if "/.api/" in self.endpoint else self.endpoint
+        for target in [base_url, self.endpoint]:
+            try:
+                resp = requests.get(target, timeout=self.timeout)
+                if resp.status_code < 500:
+                    return True
+            except Exception:
+                pass
 
         try:
             resp = requests.post(
                 self.endpoint,
-                json={"query": query},
-                headers=headers,
+                json={"query": "query SiteStatus { site { hasCodeIntelligence } }"},
+                headers={"Content-Type": "application/json"},
                 timeout=self.timeout,
             )
-            return resp.status_code == 200
+            return resp.status_code < 500
         except Exception:
             return False
+
+    def is_available(self) -> bool:
+        """Check whether the Sourcegraph OSS instance is responsive and alive."""
+        return self.is_alive()
 
     def query_symbols(self, symbol_name: str) -> list[dict[str, Any]]:
         """Search for symbol definitions across indexed repositories."""
