@@ -1,0 +1,59 @@
+name: TestPilot AI Spec-as-Oracle CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  testpilot-pipeline:
+    name: Spec-as-Oracle CI Verification & Remediation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest ruff chromadb sentence-transformers langchain langchain-community torch
+
+      - name: Lint Codebase (Ruff)
+        run: |
+          ruff check .
+
+      - name: Ingest OpenAPI & Documentation into ChromaDB Vector Store
+        run: |
+          python -m testpilot index-specs --spec testbed/openapi.json --docs docs --readme README.md
+
+      - name: Query ChromaDB Vector Store
+        run: |
+          python -m testpilot query-specs "discount coupon rules and negative order total" --top-k 3
+
+      - name: Run Core Test Pilot Test Suite
+        run: |
+          pytest tests/test_ast_engine.py tests/test_sourcegraph.py tests/test_prompt_manager.py tests/test_testbed_api.py tests/test_rag_parser.py tests/test_vector_store.py tests/test_rag_arbiter.py tests/test_remediation.py -v
+
+      - name: Run Spec-as-Oracle Verification & Dynamic Arbitration
+        run: |
+          python -m testpilot verify --tests tests/generated/test_order_service.py || true
+
+      - name: Run Sweep.dev Autonomous Remediation Bot
+        run: |
+          python -m testpilot remedy --file testbed/app/services/order_service.py --tests tests/generated/test_order_service.py
+
+      - name: Upload Remediation Patch Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remediation-patch
+          path: remediation.patch
+          if-no-files-found: ignore

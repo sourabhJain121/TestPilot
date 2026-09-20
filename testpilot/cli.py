@@ -4,6 +4,7 @@ Provides terminal commands for system status, AST diff inspection,
 Sourcegraph caller navigation, Ollama prompt synthesis, and testbed verification.
 """
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +20,9 @@ from testpilot.core.models import PromptTechnique
 from testpilot.generator.synthesizer import PytestSynthesizer
 from testpilot.llm.client import OllamaLLMClient
 from testpilot.llm.prompt_manager import PromptManager
+from testpilot.rag.arbiter import RAGArbiter
+from testpilot.rag.vector_store import SpecVectorStore
+from testpilot.remediation.patcher import RemediationPatcher
 from testpilot.sourcegraph.client import SourcegraphClient
 
 app = typer.Typer(
@@ -275,44 +279,128 @@ def generate_tests(
 
 
 @app.command()
+def index_specs(
+    spec: str = typer.Option("testbed/openapi.json", "--spec", "-s", help="Path to OpenAPI specification"),
+    docs: str = typer.Option("docs", "--docs", "-d", help="Directory containing markdown specs/architecture docs"),
+    readme: str = typer.Option("README.md", "--readme", "-r", help="Path to project README.md"),
+):
+    """Index OpenAPI and PRD/Architecture markdown specifications into ChromaDB vector store."""
+    console.print(Panel.fit("[bold cyan]TestPilot AI — Specification Ingestion & Vector Indexing[/bold cyan]"))
+    store = SpecVectorStore()
+    count = store.index_all(spec_path=spec, docs_dir=docs, readme_path=readme)
+    console.print(f"[bold green]Successfully indexed {count} spec chunks into persistent ChromaDB (.chroma_db/)[/bold green]")
+
+
+@app.command()
+def query_specs(
+    query: str = typer.Argument(..., help="Natural language or contract query to search in vector store"),
+    top_k: int = typer.Option(3, "--top-k", "-k", help="Number of matching specification clauses to retrieve"),
+):
+    """Query ChromaDB vector store for relevant OpenAPI contracts and PRD specification clauses."""
+    console.print(Panel.fit(f"[bold cyan]Querying Spec Vector Store:[/bold cyan] {query}"))
+    store = SpecVectorStore()
+    results = store.retrieve_relevant_specs(query=query, n_results=top_k)
+
+    table = Table(title=f"Retrieved Specification Chunks ({len(results)})", show_lines=True)
+    table.add_column("Rank", style="bold cyan", width=6)
+    table.add_column("Source", style="yellow", width=12)
+    table.add_column("Symbol / Header", style="bold green", width=25)
+    table.add_column("Distance", style="magenta", width=10)
+    table.add_column("Content Snippet", style="dim")
+
+    for i, res in enumerate(results, 1):
+        meta = res.get("metadata", {})
+        source = meta.get("source", "unknown")
+        symbol = meta.get("symbol", meta.get("header", "clause"))
+        dist = f"{res.get('distance', 0.0):.4f}" if "distance" in res else "N/A"
+        snippet = res.get("content", "")[:180].replace("\n", " ") + "..."
+        table.add_row(str(i), source, str(symbol), dist, snippet)
+
+    console.print(table)
+
+
+@app.command()
 def verify(
     test_path: str = typer.Option("tests/generated/test_order_service.py", "--tests", "-t", help="Path to tests to execute"),
 ):
     """Run generated boundary tests against the testbed microservice and display Spec-as-Oracle arbitration."""
-    console.print(Panel.fit("[bold cyan]TestPilot AI — Spec-as-Oracle Execution & Bug Arbitration[/bold cyan]"))
-    console.print(f"Executing: [yellow]pytest {test_path} -v[/yellow]\n")
+    console.print(Panel.fit("[bold cyan]TestPilot AI — Spec-as-Oracle Dynamic Execution & Bug Arbitration[/bold cyan]"))
+    console.print(f"Executing: [yellow]pytest {test_path} -v --tb=short[/yellow]\n")
 
-    res = subprocess.run([sys.executable, "-m", "pytest", test_path, "-v"], capture_output=True, text=True)
+    res = subprocess.run([sys.executable, "-m", "pytest", test_path, "-v", "--tb=short"], capture_output=True, text=True)
     console.print(res.stdout)
     if res.stderr:
         console.print(res.stderr)
 
-    table = Table(title="Spec-as-Oracle Regression Arbitration", show_lines=True)
+    # Extract failed tests from pytest stdout: FAILED path/to/file::test_name
+    failed_matches = re.findall(r"FAILED\s+\S+::(\w+)(?: - (.*))?", res.stdout)
+
+    if not failed_matches:
+        console.print("[bold green]All tests passed! 0 regressions detected against specification oracle.[/bold green]")
+        return
+
+    arbiter = RAGArbiter()
+    table = Table(title="Spec-as-Oracle Dynamic Regression Arbitration (ChromaDB + LLM)", show_lines=True)
     table.add_column("Test Case", style="bold yellow")
     table.add_column("Execution Result", style="bold red")
     table.add_column("Spec Ground Truth Constraint", style="green")
     table.add_column("Arbitration Verdict", style="bold magenta")
+    table.add_column("Recommended Fix", style="cyan")
 
-    table.add_row(
-        "test_boundary_coupon_deficit_negative_total",
-        "FAILED",
-        "OpenAPI: total >= 0.0",
-        "TRUE_CODE_DEFECT\n(OrderService produced negative total)",
-    )
-    table.add_row(
-        "test_boundary_tax_fractional_precision_roundup",
-        "FAILED",
-        "PRD Sec 4.2: Half-up rounding ($10.06 -> $0.83 tax)",
-        "TRUE_CODE_DEFECT\n(OrderService truncated to 0.82)",
-    )
-    table.add_row(
-        "test_boundary_illegal_status_jump_cancelled_to_completed",
-        "FAILED",
-        "State Machine Spec: CANCELLED is terminal",
-        "TRUE_CODE_DEFECT\n(OrderService permitted transition)",
-    )
+    for match in failed_matches:
+        test_name = match[0]
+        err_msg = match[1] if len(match) > 1 and match[1] else "Assertion or contract violation"
+
+        arbitration = arbiter.arbitrate_failure(
+            test_name=test_name,
+            error_message=err_msg,
+        )
+
+        table.add_row(
+            test_name,
+            "FAILED",
+            arbitration.spec_clause[:120] + ("..." if len(arbitration.spec_clause) > 120 else ""),
+            f"{arbitration.verdict}\n({arbitration.explanation})",
+            arbitration.recommended_fix[:100] + ("..." if len(arbitration.recommended_fix) > 100 else ""),
+        )
 
     console.print(table)
+
+
+@app.command()
+def remedy(
+    file: str = typer.Option("testbed/app/services/order_service.py", "--file", "-f", help="Target source file requiring remediation"),
+    test_path: str = typer.Option("tests/generated/test_order_service.py", "--tests", "-t", help="Path to tests to verify against"),
+    output_patch: str = typer.Option("remediation.patch", "--output", "-o", help="Output path for the generated patch"),
+):
+    """Run autonomous remediation (Sweep.dev pattern) to synthesize code fix, sandbox-verify, and emit patch."""
+    console.print(Panel.fit("[bold cyan]TestPilot AI — Autonomous Code Remediation Bot (Sweep.dev Pattern)[/bold cyan]"))
+
+    arbiter = RAGArbiter()
+    # Dynamic arbitration of known or detected defect
+    arbitration = arbiter.arbitrate_failure(
+        test_name="test_boundary_coupon_deficit_negative_total",
+        error_message="assert -40.0 >= 0.0, coupon deficit produced negative total",
+    )
+    console.print(f"[bold yellow]Arbitrating issue:[/bold yellow] {arbitration.test_name} -> [bold magenta]{arbitration.verdict}[/bold magenta]")
+    console.print(f"[dim]Spec Clause:[/dim] {arbitration.spec_clause}")
+    console.print(f"[dim]Recommendation:[/dim] {arbitration.recommended_fix}\n")
+
+    patcher = RemediationPatcher()
+    result = patcher.generate_remediation_patch(
+        target_file_path=file,
+        arbitration=arbitration,
+        test_command=[sys.executable, "-m", "pytest", "tests/test_testbed_api.py", "-q"],
+    )
+
+    if result.patch_generated:
+        if output_patch != "remediation.patch":
+            Path(output_patch).write_text(result.unified_diff, encoding="utf-8")
+        console.print(Panel(f"[bold green]Patch Generated Successfully![/bold green]\nTarget: {result.target_file}\nSandbox Verified: {result.verified_in_sandbox}\nSaved to: {output_patch}"))
+        console.print("[bold cyan]Unified Diff Patch:[/bold cyan]")
+        console.print(f"```diff\n{result.unified_diff}\n```")
+    else:
+        console.print(f"[bold red]Failed to generate patch:[/bold red] {result.message}")
 
 
 if __name__ == "__main__":

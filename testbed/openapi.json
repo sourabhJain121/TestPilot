@@ -146,7 +146,7 @@
           "Orders"
         ],
         "summary": "Transition Order Status",
-        "description": "Execute a lifecycle status transition for an order.",
+        "description": "Execute a lifecycle status transition for an order. Enforces that CANCELLED and COMPLETED are terminal states that cannot transition to any other status (illegal transition must return False).",
         "operationId": "transition_order_status_orders_transition_status_post",
         "requestBody": {
           "content": {

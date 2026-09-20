@@ -30,6 +30,11 @@ dist/
 # Sourcegraph data
 sourcegraph-data/
 
+# ChromaDB vector store
+.chroma_db/
+.ruff_cache/
+remediation.patch
+
 # OS files
 .DS_Store
 Thumbs.db
