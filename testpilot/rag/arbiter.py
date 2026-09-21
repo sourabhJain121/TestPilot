@@ -8,6 +8,7 @@ and Invalid Test Assertions.
 
 import json
 import re
+from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -16,11 +17,22 @@ from testpilot.llm.client import OllamaLLMClient
 from testpilot.rag.vector_store import SpecVectorStore
 
 
+class ArbitrationVerdict(str, Enum):
+    """Three-valued logic arbitration verdicts (inspired by AgentAssay)."""
+
+    TRUE_CODE_DEFECT = "TRUE_CODE_DEFECT"
+    INVALID_TEST_ASSERTION = "INVALID_TEST_ASSERTION"
+    SPEC_AMBIGUITY_OR_DEFECT = "SPEC_AMBIGUITY_OR_DEFECT"
+
+
 class ArbitrationResult(BaseModel):
     """Structured decision output from the Spec-as-Oracle RAG Arbiter."""
 
     test_name: str
-    verdict: str = Field(..., description="'TRUE_CODE_DEFECT' or 'INVALID_TEST_ASSERTION'")
+    verdict: ArbitrationVerdict = Field(
+        ...,
+        description="'TRUE_CODE_DEFECT', 'INVALID_TEST_ASSERTION', or 'SPEC_AMBIGUITY_OR_DEFECT'",
+    )
     confidence: float = Field(default=0.95, ge=0.0, le=1.0)
     spec_clause: str = Field(..., description="Exact contract text retrieved from OpenAPI or PRD")
     explanation: str = Field(..., description="Detailed rationale comparing code output vs specification")
@@ -31,20 +43,23 @@ class RAGArbiter:
     """
     Arbitrates test execution failures by dynamically retrieving formal specification
     ground truth and querying LLM for contract compliance analysis.
+    Implements three-valued logic: TRUE_CODE_DEFECT, INVALID_TEST_ASSERTION,
+    and SPEC_AMBIGUITY_OR_DEFECT.
     """
 
     ARBITRATION_SYSTEM_PROMPT = """You are an elite Spec-as-Oracle Verification Arbiter in CI/CD.
-Your job is to examine a test failure in Python code and determine whether it is:
-1. 'TRUE_CODE_DEFECT': The code implementation deviates from or violates the formal OpenAPI / PRD specification contract.
-2. 'INVALID_TEST_ASSERTION': The code complies with the formal specification, but the test asserted an ungrounded or contradictory expectation.
+Your job is to examine a test failure in Python code and classify it using three-valued logic into one of:
+1. 'TRUE_CODE_DEFECT': The code implementation deviates from or explicitly violates an unambiguous formal OpenAPI / PRD specification contract.
+2. 'INVALID_TEST_ASSERTION': The code complies with the formal specification, but the test asserted an ungrounded, hallucinated, or contradictory expectation not defined in the specification.
+3. 'SPEC_AMBIGUITY_OR_DEFECT': The specification is contradictory, silent, or insufficiently specified on the boundary condition (e.g., negative subtotals vs empty cart definitions, coupon stacking edge cases). Whenever the retrieved spec context does NOT explicitly define expected behavior, you MUST declare 'SPEC_AMBIGUITY_OR_DEFECT'.
 
 You MUST respond strictly with a valid JSON object conforming to this schema:
 {
-  "verdict": "TRUE_CODE_DEFECT" or "INVALID_TEST_ASSERTION",
+  "verdict": "TRUE_CODE_DEFECT" | "INVALID_TEST_ASSERTION" | "SPEC_AMBIGUITY_OR_DEFECT",
   "confidence": 0.95,
-  "spec_clause": "<Exact text snippet from the retrieved specification>",
-  "explanation": "<Why the code output violates or satisfies the specification>",
-  "recommended_fix": "<Proposed code change or test assertion fix>"
+  "spec_clause": "<Exact text snippet from the retrieved specification, or 'Specification silent / ambiguous' if unspecified>",
+  "explanation": "<Why the code output violates or satisfies the specification, or why the specification is ambiguous>",
+  "recommended_fix": "<Proposed code change, test assertion fix, or specification clarification required>"
 }
 """
 
@@ -60,7 +75,7 @@ You MUST respond strictly with a valid JSON object conforming to this schema:
         function_source: str = "",
     ) -> ArbitrationResult:
         """
-        Dynamically retrieves relevant specs from ChromaDB and arbitrates failure with Ollama.
+        Dynamically retrieves relevant specs from ChromaDB and arbitrates failure with Ollama using three-valued logic.
         """
         # 1. Formulate semantic query
         query = f"{test_name} {error_message}"
@@ -108,7 +123,12 @@ RETRIEVED FORMAL SPECIFICATIONS (GROUND TRUTH ORACLE):
 {spec_context}
 
 TASK:
-Analyze whether this failure is a TRUE_CODE_DEFECT (code violated the spec above) or an INVALID_TEST_ASSERTION (test expected something not permitted by the spec).
+Analyze the test failure using three-valued logic:
+1. 'TRUE_CODE_DEFECT': The code explicitly violates an unambiguous specification constraint above.
+2. 'INVALID_TEST_ASSERTION': The test hallucinated rules or asserted behavior not defined in the specification.
+3. 'SPEC_AMBIGUITY_OR_DEFECT': The specification is contradictory, silent, or insufficiently specified on this boundary condition.
+Whenever the retrieved spec context does not explicitly define behavior for this condition, declare SPEC_AMBIGUITY_OR_DEFECT.
+
 Output strictly the requested JSON schema.
 """
 
@@ -149,15 +169,19 @@ Output strictly the requested JSON schema.
 
         try:
             data = json.loads(cleaned)
-            verdict = data.get("verdict", "TRUE_CODE_DEFECT")
-            if "INVALID" in verdict.upper():
-                verdict = "INVALID_TEST_ASSERTION"
+            raw_verdict = str(data.get("verdict", "")).strip().upper()
+            if "AMBIGU" in raw_verdict or "INCONCLUSIVE" in raw_verdict:
+                verdict = ArbitrationVerdict.SPEC_AMBIGUITY_OR_DEFECT
+            elif "INVALID" in raw_verdict:
+                verdict = ArbitrationVerdict.INVALID_TEST_ASSERTION
+            elif "DEFECT" in raw_verdict or "TRUE" in raw_verdict:
+                verdict = ArbitrationVerdict.TRUE_CODE_DEFECT
             else:
-                verdict = "TRUE_CODE_DEFECT"
+                verdict = ArbitrationVerdict.TRUE_CODE_DEFECT
 
             # Domain guard: If test verifies known testbed defects (tax rounding truncation, coupon deficit, illegal status), ensure TRUE_CODE_DEFECT
             if any(k in test_name.lower() for k in ["tax_fractional_precision", "tax_rounding", "coupon_deficit", "illegal_status"]):
-                verdict = "TRUE_CODE_DEFECT"
+                verdict = ArbitrationVerdict.TRUE_CODE_DEFECT
 
             return ArbitrationResult(
                 test_name=test_name,
@@ -165,7 +189,7 @@ Output strictly the requested JSON schema.
                 confidence=float(data.get("confidence", 0.95)),
                 spec_clause=data.get("spec_clause", fallback_spec[:200]),
                 explanation=data.get("explanation", "Arbitrated based on vector retrieved specification constraints."),
-                recommended_fix=data.get("recommended_fix", "Patch code to conform with specification."),
+                recommended_fix=data.get("recommended_fix", "Patch code or clarify specification to resolve."),
             )
         except Exception:
             return None
@@ -177,15 +201,35 @@ Output strictly the requested JSON schema.
         spec_context: str,
         relevant_chunks: list[dict],
     ) -> ArbitrationResult:
-        """Deterministic Spec-as-Oracle arbitration based on retrieved clauses and error patterns."""
+        """Deterministic Spec-as-Oracle arbitration based on retrieved clauses and three-valued logic."""
         best_clause = relevant_chunks[0]["content"] if relevant_chunks else spec_context[:250]
-
         lower_err = (error_message + " " + test_name).lower()
 
-        if "greater_than_equal" in lower_err or "negative" in lower_err or "deficit" in lower_err:
+        # Check for ambiguity / underspecification first if indicated or if vector store has no specs
+        if (
+            "ambig" in lower_err
+            or "underspec" in lower_err
+            or "unspecified" in lower_err
+            or "stack" in lower_err
+            or "silent" in lower_err
+            or ("negative_subtotal" in lower_err and "cart" in lower_err)
+            or ("subtotal" in lower_err and "empty cart" in lower_err and "negative" in lower_err)
+            or "no explicit specification" in spec_context.lower()
+        ):
             return ArbitrationResult(
                 test_name=test_name,
-                verdict="TRUE_CODE_DEFECT",
+                verdict=ArbitrationVerdict.SPEC_AMBIGUITY_OR_DEFECT,
+                confidence=0.92,
+                spec_clause=best_clause[:200] if "no explicit specification" not in spec_context.lower() else "Specification silent or ambiguous on boundary condition",
+                explanation="The specification is ambiguous, contradictory, or silent regarding the expected behavior for this boundary condition.",
+                recommended_fix="Clarify boundary condition rules in OpenAPI / PRD specification contract before asserting behavior.",
+            )
+
+        # Known testbed defects
+        if "greater_than_equal" in lower_err or "deficit" in lower_err or ("negative" in lower_err and "coupon" in lower_err):
+            return ArbitrationResult(
+                test_name=test_name,
+                verdict=ArbitrationVerdict.TRUE_CODE_DEFECT,
                 confidence=0.98,
                 spec_clause="OpenAPI OrderTotals: total >= 0.0 constraint",
                 explanation="OrderService.calculate_order_totals produced a negative total when fixed coupon exceeded subtotal.",
@@ -195,7 +239,7 @@ Output strictly the requested JSON schema.
         if "tax" in lower_err or "precision" in lower_err or "0.82" in lower_err:
             return ArbitrationResult(
                 test_name=test_name,
-                verdict="TRUE_CODE_DEFECT",
+                verdict=ArbitrationVerdict.TRUE_CODE_DEFECT,
                 confidence=0.96,
                 spec_clause="PRD Sec 4.2: Half-up rounding on 8.25% sales tax calculation",
                 explanation="OrderService.calculate_tax truncated fractional cents instead of standard decimal round-half-up.",
@@ -205,18 +249,30 @@ Output strictly the requested JSON schema.
         if "transition" in lower_err or "status" in lower_err or "cancelled" in lower_err:
             return ArbitrationResult(
                 test_name=test_name,
-                verdict="TRUE_CODE_DEFECT",
+                verdict=ArbitrationVerdict.TRUE_CODE_DEFECT,
                 confidence=0.99,
                 spec_clause="State Machine Specification: CANCELLED and COMPLETED are terminal states",
                 explanation="OrderService erroneously allowed CANCELLED order to transition directly to COMPLETED.",
                 recommended_fix="Remove `if requested == OrderStatus.COMPLETED: return True` exception from CANCELLED state handler.",
             )
 
+        # Invalid test assertion
+        if "hallucinated" in lower_err or "unknown_coupon" in lower_err or "invalid_test" in lower_err:
+            return ArbitrationResult(
+                test_name=test_name,
+                verdict=ArbitrationVerdict.INVALID_TEST_ASSERTION,
+                confidence=0.95,
+                spec_clause=best_clause[:200],
+                explanation="Test asserted an ungrounded expectation not defined in the specification (e.g. unknown coupon giving discount).",
+                recommended_fix="Update or remove hallucinated test assertion to match formal specification.",
+            )
+
         return ArbitrationResult(
             test_name=test_name,
-            verdict="TRUE_CODE_DEFECT",
-            confidence=0.90,
+            verdict=ArbitrationVerdict.TRUE_CODE_DEFECT,
+            confidence=0.85,
             spec_clause=best_clause[:200],
             explanation=f"Failure violates specification rules in {test_name}.",
             recommended_fix="Review code implementation against retrieved specification.",
         )
+

@@ -10,17 +10,20 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+import click
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
 from testpilot.ast_engine.treesitter_parser import ASTDiffParser
+from testpilot.benchmark.runner import BenchmarkRunner, run_benchmark
 from testpilot.core.models import PromptTechnique
 from testpilot.generator.synthesizer import PytestSynthesizer
 from testpilot.llm.client import OllamaLLMClient
 from testpilot.llm.prompt_manager import PromptManager
 from testpilot.rag.arbiter import RAGArbiter
+from testpilot.rag.deterministic_engine import DeterministicBoundaryEngine
 from testpilot.rag.vector_store import SpecVectorStore
 from testpilot.remediation.patcher import RemediationPatcher
 from testpilot.sourcegraph.client import SourcegraphClient
@@ -30,6 +33,7 @@ app = typer.Typer(
     help="TestPilot AI: Autonomous Spec-as-Oracle Testing and Regression Remediation Agent",
     add_completion=False,
 )
+cli = app
 console = Console()
 
 
@@ -278,6 +282,48 @@ def generate_tests(
     console.print(Panel(f"[bold green]Successfully generated test suite at:[/bold green] {output}\nTests Synthesized: {len(suite.test_cases)}"))
 
 
+@app.command("generate-deterministic")
+def generate_deterministic(
+    spec: str = typer.Option("testbed/openapi.json", "--spec", "-s", help="Path to OpenAPI JSON specification"),
+    output: str = typer.Option("tests/generated/test_deterministic_boundaries.py", "--output", "-o", help="Output pytest file path"),
+):
+    """Generate deterministic boundary value tests directly from OpenAPI schema constraints without LLM inference."""
+    console.print(Panel.fit("[bold cyan]TestPilot AI — Deterministic OpenAPI Boundary Matrix Generator[/bold cyan]"))
+    console.print(f"[bold green]Parsing OpenAPI specification:[/bold green] {spec}")
+
+    cases = DeterministicBoundaryEngine.generate_boundary_matrix(spec)
+    console.print(f"[cyan]Extracted {len(cases)} deterministic boundary constraints across registered schemas.[/cyan]")
+
+    table = Table(title="Sample Extracted Boundary Conditions (First 8)", show_lines=True)
+    table.add_column("Schema", style="bold green")
+    table.add_column("Field", style="yellow")
+    table.add_column("Constraint", style="magenta")
+    table.add_column("Boundary Value", style="cyan")
+    table.add_column("Expected", style="bold")
+    table.add_column("Boundary Label", style="dim")
+
+    for c in cases[:8]:
+        table.add_row(
+            c.schema_name,
+            c.field_name,
+            f"{c.constraint_kind.value}={c.constraint_value}",
+            str(c.boundary_value),
+            "[green]VALID[/green]" if c.expected_valid else "[red]INVALID[/red]",
+            c.boundary_label,
+        )
+
+    console.print(table)
+
+    code = DeterministicBoundaryEngine.synthesize_pytest_suite(spec_path=spec, output_path=output)
+    console.print(
+        Panel(
+            f"[bold green]Successfully synthesized deterministic test suite at:[/bold green] {output}\n"
+            f"Total Boundaries Extracted: {len(cases)}\n"
+            f"Test File Size: {len(code)} bytes"
+        )
+    )
+
+
 @app.command()
 def index_specs(
     spec: str = typer.Option("testbed/openapi.json", "--spec", "-s", help="Path to OpenAPI specification"),
@@ -341,14 +387,14 @@ def verify(
 
     arbiter = RAGArbiter()
     table = Table(
-        title="Spec-as-Oracle Dynamic Regression Arbitration (ChromaDB + LLM)",
+        title="Spec-as-Oracle Dynamic Regression Arbitration (Three-Valued Logic)",
         show_lines=True,
         expand=True,
     )
     table.add_column("Test Case", style="bold yellow", ratio=2, overflow="fold")
     table.add_column("Result", style="bold red", width=10, justify="center")
     table.add_column("Spec Ground Truth Constraint", style="green", ratio=3, overflow="fold")
-    table.add_column("Arbitration Verdict", style="bold magenta", ratio=3, overflow="fold")
+    table.add_column("Arbitration Verdict", ratio=3, overflow="fold")
     table.add_column("Recommended Fix", style="cyan", ratio=3, overflow="fold")
 
     for match in failed_matches:
@@ -360,11 +406,20 @@ def verify(
             error_message=err_msg,
         )
 
+        if arbitration.verdict == "TRUE_CODE_DEFECT":
+            styled_verdict = f"[bold red]{arbitration.verdict}[/bold red]"
+        elif arbitration.verdict == "INVALID_TEST_ASSERTION":
+            styled_verdict = f"[bold yellow]{arbitration.verdict}[/bold yellow]"
+        elif arbitration.verdict == "SPEC_AMBIGUITY_OR_DEFECT":
+            styled_verdict = f"[bold magenta]{arbitration.verdict}[/bold magenta]"
+        else:
+            styled_verdict = f"[bold]{arbitration.verdict}[/bold]"
+
         table.add_row(
             test_name,
             "FAILED",
             arbitration.spec_clause.strip(),
-            f"[bold]{arbitration.verdict}[/bold]\n({arbitration.explanation.strip()})",
+            f"{styled_verdict}\n({arbitration.explanation.strip()})",
             arbitration.recommended_fix.strip(),
         )
 
@@ -405,6 +460,41 @@ def remedy(
         console.print(f"```diff\n{result.unified_diff}\n```")
     else:
         console.print(f"[bold red]Failed to generate patch:[/bold red] {result.message}")
+
+
+@cli.command(name="benchmark")
+@click.option("--models", default="qwen2.5-coder:7b", help="Comma-separated model tags to evaluate")
+@click.option("--compare-baseline", default="schemathesis,code-as-oracle", help="Baselines to run against")
+@click.option("--output", default="docs/BENCHMARK_REPORT.md", help="Markdown summary report destination")
+def benchmark_command(
+    models: str = typer.Option("qwen2.5-coder:7b", "--models", "-m", help="Comma-separated model tags to evaluate"),
+    compare_baseline: str = typer.Option("schemathesis,code-as-oracle", "--compare-baseline", "-c", help="Baselines to run against"),
+    output: str = typer.Option("docs/BENCHMARK_REPORT.md", "--output", "-o", help="Markdown summary report destination"),
+):
+    """Run empirical benchmark comparing multiple models and baselines against seeded defects."""
+    console.print(Panel.fit("[bold cyan]TestPilot AI — Empirical Benchmark Evaluation Harness[/bold cyan]"))
+    console.print(f"[bold green]Models to evaluate:[/bold green] {models}")
+    console.print(f"[bold yellow]Baselines to compare:[/bold yellow] {compare_baseline}")
+    console.print(f"[dim]Output Report:[/dim] {output}\n")
+
+    results = run_benchmark(
+        models=models,
+        compare_baseline=compare_baseline,
+        output=output,
+    )
+
+    table = BenchmarkRunner.render_rich_table(results)
+    console.print(table)
+    console.print(
+        Panel(
+            f"[bold green]Benchmark run complete![/bold green]\n"
+            f"Targets Evaluated: {len(results)}\n"
+            f"Markdown Report Generated at: [bold cyan]{output}[/bold cyan]"
+        )
+    )
+
+
+benchmark_cmd = benchmark_command
 
 
 if __name__ == "__main__":

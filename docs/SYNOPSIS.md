@@ -9,28 +9,27 @@
 
 ## 1. Executive Summary & Problem Definition
 
-In modern continuous integration and delivery (CI/CD) pipelines, automated testing is the primary gatekeeper for software reliability. However, developer velocity is severely impeded by three critical limitations in current AI and heuristic testing tools:
+In modern continuous integration and delivery (CI/CD) pipelines, automated testing is the primary gatekeeper for software reliability. While schema-conformance and property-based fuzzing tools like **Schemathesis** and **Specmatic** have established the practice of testing endpoints against OpenAPI specifications, they treat any schema-request mismatch as an undifferentiated failure and do not analyze code ASTs or arbitrate why a test failed. Conversely, emerging LLM-based test generators frequently treat fallible source code as the oracle, encoding bugs into test assertions and creating persistent test debt.
 
-1. **Hallucinated Assertions & Test Debt**: Existing LLM test generators treat existing source code as the ground truth. When source code contains subtle boundary defects or logic regressions, the LLM faithfully encodes the buggy behavior into test assertions, effectively formalizing code defects as expected behavior.
-2. **Specification Drift**: Software contracts (OpenAPI 3.1 specifications, PRD documentation, API schemas) rapidly diverge from implementation code over successive pull requests. Current CI/CD systems lack semantic cross-verification between code diffs and formal contracts.
-3. **Triaging Friction (Bug vs. Bad Test)**: When a CI test fails, engineers spend hours diagnosing whether the test was flaky/drifted or if a genuine production regression occurred.
-
-**TestPilot AI** solves this by pioneering the **Spec-as-Oracle** paradigm. By combining multi-modal code intelligence (Tree-sitter AST parsing, Sourcegraph code graphs, and OpenAPI contract embeddings), TestPilot AI treats formal specifications as the ground truth oracle to automatically synthesize boundary-hardened test suites, arbitrate failure causes, and auto-generate remediation pull requests.
+TestPilot AI does not claim that utilizing specifications as an oracle is inherently new; rather, TestPilot's true novelty lies in three core technical contributions:
+1. **Automated Triaging Arbiter (Three-Valued Logic)**: Directly addresses the triaging friction between code defects and bad tests by implementing three-valued logic (inspired by *AgentAssay*) to classify execution failures into `TRUE_CODE_DEFECT`, `INVALID_TEST_ASSERTION`, or `SPEC_AMBIGUITY_OR_DEFECT` via ChromaDB semantic vector retrieval and local LLM reasoning.
+2. **AST-Grounded Boundary Synthesis**: Combines deterministic OpenAPI schema boundary extraction (numeric extrema, string lengths, enum bounds) with syntax-level AST code intelligence (branch conditionals, parameter bounds) and Chain-of-Thought LLM reasoning over complex PRD business logic.
+3. **Closed-Loop Remediation**: Validated automated patch generation via regression sandboxing (pytest) before generating branch/PR artifacts (Sweep.dev pattern).
 
 ---
 
-## 2. Strategic Differentiation: TestForge vs. TestPilot AI
+## 2. Strategic Differentiation: Industry Tools vs. TestForge vs. TestPilot AI
 
-To maintain clear academic rigor and prevent project overlap, TestPilot AI establishes a distinct architectural boundary from prior unit-level mutation testing systems (such as TestForge):
+To maintain clear academic rigor and prevent project overlap, TestPilot AI establishes a distinct architectural boundary from prior unit-level mutation testing systems (such as TestForge) and industry schema fuzzers (such as Schemathesis and Specmatic):
 
-| Dimension | TestForge (Prior Project: CSE 3101) | TestPilot AI (This Project: CSE 4011) |
-| :--- | :--- | :--- |
-| **Core Problem** | Eliminating hollow tests with low mutation kill rates | Specification drift and regressions in CI/CD PRs |
-| **Ground Truth / Oracle** | **Code is Oracle**: Mutates source code to check test sensitivity | **Spec is Oracle**: Code is fallible; OpenAPI/PRD acts as ground truth |
-| **Execution Domain** | Local interactive workstation (Streamlit UI) | **Headless Production CI/CD Pipeline** (CLI + GitHub Actions) |
-| **Scope of Intelligence** | Single isolated Python file/module | **Repository-Wide Code Graph** (Sourcegraph AST + blast radius) |
-| **Core AI Architecture** | Local MLX GPU Multi-Layer Perceptron Classifier | **Prompt Harness & Spec RAG** (Ollama Qwen2.5-Coder + LangChain) |
-| **Failure Resolution** | Regenerates test assertions until mutants die | **Arbitrates Defect vs. Test Debt** and proposes code fix PRs |
+| Dimension | Schemathesis / Specmatic | TestForge (Prior Project: CSE 3101) | TestPilot AI (This Project: CSE 4011) |
+| :--- | :--- | :--- | :--- |
+| **Core Problem** | API schema validation & black-box fuzzing | Eliminating hollow tests with low mutation kill rates | Regression triaging, spec drift, & test debt in CI/CD PRs |
+| **Ground Truth / Oracle** | Strict OpenAPI Schema alone | **Code is Oracle**: Mutates source code to check test sensitivity | **Spec-as-Oracle**: Formal OpenAPI contracts + PRD semantic constraints |
+| **Execution Domain** | CLI HTTP endpoint fuzzing runner | Local interactive workstation (Streamlit UI) | **Headless Production CI/CD Pipeline** (Rich Typer CLI + GitHub Actions) |
+| **Scope of Intelligence** | HTTP boundary payloads (no AST) | Single isolated Python file/module | **Repository-Wide Code Graph** (Sourcegraph AST + blast radius + schema bounds) |
+| **Core AI Architecture** | Hypothesis property-based generation | Local MLX GPU Multi-Layer Perceptron Classifier | **Hybrid Deterministic Schema Extractor + Prompt Harness (Zero/Few/CoT)** + Ollama |
+| **Failure Resolution** | Raw HTTP failure traceback | Regenerates test assertions until mutants die | **Three-Valued Arbiter** (`DEFECT`, `INVALID_TEST`, `SPEC_AMBIGUITY`) + Auto-Patch PRs |
 
 ---
 
@@ -38,18 +37,19 @@ To maintain clear academic rigor and prevent project overlap, TestPilot AI estab
 
 TestPilot AI consists of four decoupled subsystems designed for enterprise CI/CD integration:
 
-1. **Multi-Modal Ingestion Engine**: Ingests unified `git diff` patches, OpenAPI 3.1 JSON/YAML schemas, and natural-language PRD specifications.
+1. **Multi-Modal Ingestion & Vector Indexing Engine**: Ingests unified `git diff` patches, OpenAPI 3.1 JSON/YAML schemas, and natural-language PRD specifications into a persistent ChromaDB vector store with SentenceTransformer embeddings.
 2. **Code & Graph Intelligence Layer**:
-   - **Sourcegraph OSS Client**: Interfaces with Sourcegraph GraphQL API (`http://localhost:7080/.api/graphql`) to extract reference hierarchies and downstream callers of modified functions.
-   - **Resilient AST Fallback**: Native Python AST / Tree-sitter extractor parsing function definitions, parameter constraints, and branch conditions offline without requiring persistent container services.
+   - **Deterministic Boundary Extractor**: Parses OpenAPI 3.0/3.1 schemas directly for numeric and string constraints (`minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `minLength`, `maxLength`, `enum`) and synthesizes deterministic boundary test matrices without LLM overhead.
+   - **Sourcegraph OSS Client**: Interfaces with Sourcegraph GraphQL API to extract reference hierarchies and downstream callers of modified functions.
+   - **Resilient AST Fallback**: Native Python AST parser extracting function definitions, parameter constraints, and branch conditions offline.
 3. **Prompt Engineering & Synthesis Engine**:
    - Executes systematic prompt techniques: Zero-shot, Few-shot, and **Chain-of-Thought (CoT)** targeting Boundary Value Analysis (BVA).
    - Generates structured, schema-compliant JSON payloads validated via Pydantic v2 schemas.
    - Synthesizes clean, executable `pytest` test suites.
-4. **Spec-as-Oracle Arbiter & Auto-Remediation Sandbox**:
+4. **Three-Valued Spec Arbiter & Closed-Loop Remediation Sandbox**:
    - Executes synthesized tests in an isolated sandbox.
-   - Compares test failures against OpenAPI schema rules.
-   - Classifies failures into **True Code Defect** (PR violates spec) or **Invalid Test Assertion** (test contradicts spec).
+   - Evaluates test failures against retrieved specification clauses with a three-valued logic system: `TRUE_CODE_DEFECT`, `INVALID_TEST_ASSERTION`, or `SPEC_AMBIGUITY_OR_DEFECT`.
+   - Synthesizes and sandbox-validates automated code patches for confirmed code defects before emitting unified diff PR patches.
 
 ---
 

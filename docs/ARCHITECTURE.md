@@ -27,12 +27,13 @@ TestPilot AI is an autonomous, specification-grounded test generation and regres
 |        └──────────┬─────────────┘                                                 |
 |                    ▼                                                              |
 |        ┌────────────────────────┐                                                 |
-|        │  Pytest Synthesizer    │                                                 |
+|        │  Pytest Synthesizer    │ ◄── [Deterministic OpenAPI Boundary Matrices]   |
 |        └──────────┬─────────────┘                                                 |
 |                    ▼                                                              |
 |        ┌────────────────────────┐                                                 |
-|        │ Spec-as-Oracle Arbiter │ ──► [True Defect] ──► Autonomous Patch PR       |
-|        └────────────────────────┘ ──► [Test Debt]   ──► Discard & Flag            |
+|        │ Three-Valued Arbiter   │ ──► [TRUE_CODE_DEFECT]         ──► Auto Patch PR|
+|        │ (ChromaDB + Ollama)    │ ──► [INVALID_TEST_ASSERTION]   ──► Flag Debt    |
+|        └────────────────────────┘ ──► [SPEC_AMBIGUITY_OR_DEFECT] ──► Flag Spec    |
 +-----------------------------------------------------------------------------------+
 ```
 
@@ -132,4 +133,6 @@ class GeneratedTestSuite(BaseModel):
 - [x] Sourcegraph GraphQL client with local fallback (`testpilot/sourcegraph/client.py`).
 - [x] Prompt engine with Zero-shot, Few-shot, and CoT templates (`testpilot/llm/prompt_manager.py`).
 - [x] Test synthesizer and Pydantic validator (`testpilot/generator/synthesizer.py`).
-- [x] Rich terminal CLI (`testpilot`) with end-to-end dry run capability.
+- [x] Deterministic OpenAPI boundary extractor & matrix synthesizer (`testpilot/rag/deterministic_engine.py`).
+- [x] Three-valued Spec-as-Oracle Arbiter with AgentAssay logic (`testpilot/rag/arbiter.py`).
+- [x] Rich terminal CLI (`testpilot`) with end-to-end dry run and `generate-deterministic` commands.

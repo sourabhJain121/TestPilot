@@ -12,46 +12,47 @@
 
 ---
 
-## 1. The Core Paradigm: Spec-as-Oracle
+## 1. The Core Paradigm: Spec-as-Oracle & True Novelty
 
-Modern automated testing and LLM test generation tools suffer from a fatal assumption: **they treat existing code as the ground truth oracle**. When code contains subtle edge-case defects, LLMs faithfully write test assertions that test *what the code currently does*, institutionalizing bugs as permanent specification debt.
+While schema-conformance and property-based API testing tools like **Schemathesis** and **Specmatic** have long utilized OpenAPI contracts to generate endpoint fuzzing requests, they operate under rigid input-fuzzing assumptions and treat any discrepancy as an undifferentiated failure. Conversely, modern LLM-based test generators frequently treat fallible source code as the oracle, writing assertions that formalize existing software bugs as permanent specification debt.
 
-**TestPilot AI** inverts this relationship with the **Spec-as-Oracle** architecture:
-- **Specifications (OpenAPI 3.1 contracts, JSON Schemas, PRD constraints) are the infallible ground truth.**
-- Code diffs are assumed to be fallible hypotheses.
-- When an edge-case test fails in CI, TestPilot's Arbiter disambiguates between:
-  1. **True Code Defect**: Code deviated from formal specification $\rightarrow$ Auto-generates remediation patch PR.
-  2. **Invalid Test Assertion / Flaky Test**: Test asserted something contradictory to specification $\rightarrow$ Discarded.
+**TestPilot AI** reframes contract-driven testing by acknowledging prior art in schema conformance while introducing three foundational architectural novelties:
+
+1. **Automated Triaging Arbiter (Three-Valued Logic)**: Rather than reporting binary pass/fail results, TestPilot dynamically retrieves formal specification clauses via semantic RAG and employs three-valued logic (inspired by *AgentAssay*) to distinguish between:
+   - `TRUE_CODE_DEFECT`: The code implementation deviates from an unambiguous OpenAPI/PRD specification contract $\rightarrow$ triggers automated remediation.
+   - `INVALID_TEST_ASSERTION`: The test hallucinated behavior or asserted ungrounded expectations contradictory to the contract $\rightarrow$ pruned to prevent test debt.
+   - `SPEC_AMBIGUITY_OR_DEFECT`: The specification is silent, contradictory, or underspecified on the boundary condition $\rightarrow$ flagged for product/API spec review.
+2. **AST-Grounded Boundary Synthesis (Hybrid Deterministic + LLM Engine)**: Combines deterministic OpenAPI schema boundary extraction (numeric extrema, string lengths, enum bounds) and Tree-sitter AST syntax parsing (guard conditions, type annotations) with Chain-of-Thought LLM reasoning over nuanced natural-language PRD requirements.
+3. **Closed-Loop Remediation (Sweep.dev Pattern)**: Rather than merely reporting failures, TestPilot autonomously synthesizes code repairs for confirmed `TRUE_CODE_DEFECT` verdicts and executes isolated regression sandboxing (pytest) to validate the patch before generating git PRs.
 
 ```
-                    ┌────────────────────────┐
-                    │   OpenAPI 3.1 / PRD    │
-                    │ (Ground Truth Oracle)  │
-                    └───────────┬────────────┘
-                                │
-                 Is output compliant with spec?
-                                │
-                 ┌──────────────┴──────────────┐
-                 ▼                             ▼
-              [ YES ]                       [ NO ]
-      ┌───────────────────────┐   ┌───────────────────────────┐
-      │ INVALID TEST / DRIFT  │   │     TRUE CODE DEFECT      │
-      │ Suppress & flag debt  │   │ Mark PR Red & Auto-Remedy │
-      └───────────────────────┘   └───────────────────────────┘
+                    ┌──────────────────────────────────────────────┐
+                    │   OpenAPI 3.1 & PRD Specification Oracle     │
+                    │        (ChromaDB Semantic Retrieval)         │
+                    └──────────────────────┬───────────────────────┘
+                                           │
+                        Three-Valued Arbitration Logic
+                                           │
+         ┌─────────────────────────────────┼─────────────────────────────────┐
+         ▼                                 ▼                                 ▼
+┌─────────────────────────┐   ┌───────────────────────────┐   ┌───────────────────────────┐
+│ INVALID_TEST_ASSERTION  │   │     TRUE_CODE_DEFECT      │   │ SPEC_AMBIGUITY_OR_DEFECT  │
+│  Prune hallucinated or  │   │ Code violated unambiguous │   │ Specification is silent   │
+│   drifted test debt     │   │ contract -> Auto-Remedy   │   │ or ambiguous on boundary  │
+└─────────────────────────┘   └───────────────────────────┘   └───────────────────────────┘
 ```
 
 ---
 
-## 2. Strategic Differentiation: TestForge vs. TestPilot AI
+## 2. Strategic Differentiation: TestForge vs. Industry Tools vs. TestPilot AI
 
-| Dimension | TestForge (Prior Project: CSE 3101) | TestPilot AI (Target Project: CSE 4011) |
-| :--- | :--- | :--- |
-| **Core Problem** | Eliminating hollow assertions in isolated unit tests | Specification drift and regression arbitration in CI/CD PRs |
-| **Ground Truth / Oracle** | **Code is Oracle**: Mutates code to evaluate test kill rate | **Spec is Oracle**: Code is fallible; checked against OpenAPI/PRD |
-| **Execution Domain** | Local interactive workstation (Streamlit UI) | **Production CI/CD Pipelines** (Headless CLI + GitHub Actions) |
-| **Code Scope** | Single isolated Python file/module | **Full Multi-File Repo Intelligence** (Call graphs & blast radius) |
-| **Core AI Engine** | Apple MLX GPU MLP Neural Classifier | **Prompt Harness (Zero/Few/CoT)** + Ollama `qwen2.5-coder:7b` |
-| **Failure Resolution** | Retries test generation until mutants die | **Arbitrates Defect vs. Test Debt** and creates remediation PRs |
+| Dimension | Schemathesis / Specmatic | TestForge (Prior Project: CSE 3101) | TestPilot AI (Target Project: CSE 4011) |
+| :--- | :--- | :--- | :--- |
+| **Core Problem** | Schema validation & fuzzing against HTTP endpoints | Hollow assertions in isolated unit tests | Regression triaging, spec drift, & test debt in CI/CD PRs |
+| **Ground Truth Oracle** | Strict OpenAPI Schema alone | **Code is Oracle**: Mutates code to measure test kill rate | **Spec-as-Oracle**: Formal OpenAPI + PRD semantic ground truth |
+| **Boundary Analysis** | Black-box property-based fuzzing | Local heuristic mutation analysis | **AST-Grounded Syntax Extrema + Deterministic Schema Matrices + CoT LLM** |
+| **Triaging Logic** | Binary (HTTP status / schema validation fail) | Mutation survival binary score | **Three-Valued Arbiter** (`DEFECT` vs `INVALID_TEST` vs `SPEC_AMBIGUITY`) |
+| **Remediation** | None (manual engineer debugging) | Retries prompt until mutants die | **Closed-Loop Sandbox Remediation** (Automated Git patch PR) |
 
 ---
 
@@ -59,41 +60,48 @@ Modern automated testing and LLM test generation tools suffer from a fatal assum
 
 ```mermaid
 graph TD
-    subgraph Ingestion ["1. Multi-Modal Ingestion"]
+    subgraph Ingestion ["1. Multi-Modal Ingestion & Vector Indexing"]
         Diff["Unified Git Diff / PR"]
         Spec["OpenAPI 3.1 Contract (openapi.json)"]
         PRD["PRD Requirements (Markdown)"]
+        Chroma["ChromaDB Vector Store (SentenceTransformers)"]
+        Spec --> Chroma
+        PRD --> Chroma
     end
 
     subgraph Intelligence ["2. Code & Graph Intelligence"]
         AST["AST & Unified Diff Parser"]
         SG["Sourcegraph OSS GraphQL Client"]
         Fallback["Autonomous Local AST Call Graph"]
+        DetEngine["Deterministic Boundary Extractor (Schema Bounds)"]
     end
 
-    subgraph PromptEngine ["3. Prompt Engine & LLM Synthesis"]
-        PromptMgr["Prompt Manager (Zero-shot / Few-shot / CoT)"]
+    subgraph PromptEngine ["3. Boundary Synthesis Engine"]
+        PromptMgr["Prompt Manager (Zero/Few/CoT)"]
         Ollama["Local Ollama (Qwen2.5-Coder:7b)"]
-        Validator["Pydantic v2 Output Validator"]
+        Validator["Pydantic v2 Schema Validator"]
         Synth["Pytest Code Synthesizer"]
     end
 
-    subgraph Oracle ["4. Spec-as-Oracle Arbitration"]
+    subgraph Oracle ["4. Three-Valued Arbiter & Closed-Loop Remediation"]
         Runner["Isolated Test Execution (pytest)"]
-        Arbiter{"Spec-as-Oracle Arbiter"}
-        Bug["Verdict: TRUE CODE DEFECT -> Auto-Patch PR"]
-        Debt["Verdict: INVALID TEST -> Flag & Discard"]
+        Arbiter{"Three-Valued Spec Arbiter"}
+        Bug["TRUE_CODE_DEFECT -> Closed-Loop Patch Sandbox"]
+        Debt["INVALID_TEST_ASSERTION -> Prune Test Debt"]
+        Ambiguity["SPEC_AMBIGUITY_OR_DEFECT -> Flag Spec Debt"]
+        PatchBot["Sweep.dev Autonomous Remediation Bot"]
     end
 
     Diff --> AST
     Diff --> SG
     SG -.->|Docker Offline Fallback| Fallback
-    Spec --> PromptMgr
-    PRD --> PromptMgr
+    Spec --> DetEngine
+    DetEngine --> Synth
 
     AST --> PromptMgr
     SG --> PromptMgr
     Fallback --> PromptMgr
+    Chroma -.->|Retrieved Clauses| PromptMgr
 
     PromptMgr --> Ollama
     Ollama --> Validator
@@ -101,9 +109,11 @@ graph TD
     Synth --> Runner
 
     Runner --> Arbiter
-    Spec -.->|Contract Ground Truth| Arbiter
+    Chroma -.->|Contract Ground Truth| Arbiter
     Arbiter --> Bug
     Arbiter --> Debt
+    Arbiter --> Ambiguity
+    Bug --> PatchBot
 ```
 
 ---
