@@ -108,6 +108,9 @@ class SourcegraphClient:
         Check if Sourcegraph host or GraphQL endpoint responds with any HTTP status < 500.
         If the port is open and responding, marks status as ONLINE so terminal table displays green.
         """
+        if os.getenv("TESTPILOT_CI_MODE", "").lower() in ("true", "1", "yes"):
+            return False
+
         base_url = self.endpoint.split("/.api/")[0] if "/.api/" in self.endpoint else self.endpoint
         for target in [base_url, self.endpoint]:
             try:
@@ -130,6 +133,8 @@ class SourcegraphClient:
 
     def is_available(self) -> bool:
         """Check whether the Sourcegraph OSS instance is responsive and alive."""
+        if os.getenv("TESTPILOT_CI_MODE", "").lower() in ("true", "1", "yes"):
+            return False
         return self.is_alive()
 
     def query_symbols(self, symbol_name: str) -> list[dict[str, Any]]:

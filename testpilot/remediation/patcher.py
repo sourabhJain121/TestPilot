@@ -5,6 +5,7 @@ validates the fix in an isolated pytest sandbox, and exports PR patches.
 """
 
 import difflib
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -91,7 +92,7 @@ Rules:
         verified = False
         try:
             path.write_text(patched_content, encoding="utf-8")
-            cmd = test_command or [sys.executable, "-m", "pytest", "tests/test_testbed_api.py", "-q"]
+            cmd = test_command or [sys.executable, "-m", "pytest", "tests/generated/test_order_service.py", "-q"]
             res = subprocess.run(cmd, capture_output=True, text=True)
             # If exit code is 0, sandbox tests succeeded
             verified = (res.returncode == 0)
@@ -105,20 +106,43 @@ Rules:
         patch_file = Path("remediation.patch")
         patch_file.write_text(unified_diff_str, encoding="utf-8")
 
+        # If git is initialized and verified, create branch testpilot/fix-<timestamp>
+        branch_name = None
+        if verified:
+            try:
+                import time
+                branch_name = f"testpilot/fix-{int(time.time())}"
+                git_check = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True)
+                if git_check.returncode == 0:
+                    subprocess.run(["git", "branch", branch_name], capture_output=True, text=True)
+            except Exception:
+                pass
+
+        if verified:
+            msg = "Remediation patch created and verified in ephemeral sandbox. Saved to remediation.patch"
+            if branch_name:
+                msg += f" (Git branch created: {branch_name})"
+        else:
+            msg = "SANDBOX_VERIFICATION_FAILED: Synthesized patch failed test verification in ephemeral sandbox."
+
         return RemediationResult(
             target_file=target_file_path,
             patch_generated=True,
             verified_in_sandbox=verified,
             unified_diff=unified_diff_str,
-            message=f"Remediation patch created (sandbox verified: {verified}). Saved to remediation.patch",
+            message=msg,
         )
 
     def _generate_fix(self, source_code: str, arbitration: ArbitrationResult) -> str:
         """Attempt LLM fix first; fall back to deterministic domain rule repair."""
-        # Try LLM
-        health = self.llm.check_health()
-        if health["connected"] and health["model_available"]:
-            prompt = f"""
+        # If in CI mode, use deterministic domain repair directly
+        if os.getenv("TESTPILOT_CI_MODE", "").lower() in ("true", "1", "yes"):
+            pass
+        else:
+            # Try LLM
+            health = self.llm.check_health()
+            if health["connected"] and health["model_available"]:
+                prompt = f"""
 SPECIFICATION COMPLIANCE FAILURE:
 Test: {arbitration.test_name}
 Spec Clause: {arbitration.spec_clause}
@@ -133,18 +157,18 @@ ORIGINAL SOURCE CODE:
 TASK:
 Provide the complete corrected Python code with the recommended fix applied.
 """
-            try:
-                resp = self.llm.generate(
-                    prompt=prompt,
-                    system_instruction=self.PATCH_SYSTEM_PROMPT,
-                    temperature=0.1,
-                )
-                if "```python" in resp:
-                    clean = resp.split("```python")[1].split("```")[0].strip()
-                    if len(clean) > len(source_code) * 0.7:
-                        return clean
-            except Exception:
-                pass
+                try:
+                    resp = self.llm.generate(
+                        prompt=prompt,
+                        system_instruction=self.PATCH_SYSTEM_PROMPT,
+                        temperature=0.1,
+                    )
+                    if "```python" in resp:
+                        clean = resp.split("```python")[1].split("```")[0].strip()
+                        if len(clean) > len(source_code) * 0.7:
+                            return clean
+                except Exception:
+                    pass
 
         # Deterministic domain rule repair
         repaired = source_code

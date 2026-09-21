@@ -449,7 +449,7 @@ def remedy(
     result = patcher.generate_remediation_patch(
         target_file_path=file,
         arbitration=arbitration,
-        test_command=[sys.executable, "-m", "pytest", "tests/test_testbed_api.py", "-q"],
+        test_command=[sys.executable, "-m", "pytest", "tests/generated/test_order_service.py", "-q"],
     )
 
     if result.patch_generated:
@@ -460,6 +460,19 @@ def remedy(
         console.print(f"```diff\n{result.unified_diff}\n```")
     else:
         console.print(f"[bold red]Failed to generate patch:[/bold red] {result.message}")
+
+
+@app.command("remediate")
+def remediate_cmd(
+    file: str = typer.Option("testbed/app/services/order_service.py", "--file", "-f", help="Target source file requiring remediation"),
+    test_path: str = typer.Option("tests/generated/test_order_service.py", "--tests", "-t", help="Path to tests to verify against"),
+    output_patch: str = typer.Option("remediation.patch", "--output", "-o", help="Output path for the generated patch"),
+):
+    """Alias for 'remedy': Run autonomous remediation to synthesize code fix, sandbox-verify, and emit patch."""
+    remedy(file=file, test_path=test_path, output_patch=output_patch)
+
+
+remediate = remediate_cmd
 
 
 @cli.command(name="benchmark")
@@ -493,6 +506,111 @@ def benchmark_cmd(
 
 
 benchmark_command = benchmark_cmd
+
+
+@cli.command(name="ui")
+@click.option("--port", default=8501, help="Port to run the web UI dashboard")
+@click.option("--host", default="127.0.0.1", help="Host IP to bind the web server")
+def ui_cmd(
+    port: int = typer.Option(8501, "--port", "-p", help="Port to run the web UI dashboard"),
+    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host IP to bind the web server"),
+):
+    """Launch TestPilot AI Web Interface and IDE Dashboard."""
+    import os
+    import signal
+    import socket
+    import time
+
+    import uvicorn
+
+    def is_port_in_use(h: str, p: int) -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.3)
+            return s.connect_ex((h, p)) == 0
+
+    if is_port_in_use(host, port):
+        # Attempt to kill stale testpilot process listening on the port
+        try:
+            lsof = subprocess.run(["lsof", "-ti", f":{port}"], capture_output=True, text=True)
+            if lsof.stdout.strip():
+                for pid in lsof.stdout.strip().split():
+                    try:
+                        os.kill(int(pid), signal.SIGTERM)
+                    except Exception:
+                        pass
+                time.sleep(0.5)
+        except Exception:
+            pass
+
+    # If still in use, gracefully fall back to next free port
+    if is_port_in_use(host, port):
+        fallback_port = port + 1
+        while is_port_in_use(host, fallback_port) and fallback_port < port + 20:
+            fallback_port += 1
+        console.print(f"[yellow]Port {port} is occupied. Gracefully falling back to port {fallback_port}.[/yellow]")
+        port = fallback_port
+
+    console.print(Panel.fit(f"[bold cyan]Launching TestPilot AI Dashboard[/bold cyan]\nURL: [bold green]http://{host}:{port}[/bold green]"))
+    uvicorn.run("testpilot.web.api:app", host=host, port=port, reload=False)
+
+
+ui_command = ui_cmd
+
+
+@cli.command(name="check-guardrails")
+@click.option("--code-file", default="tests/generated/test_order_service.py", help="Path to code or test file to analyze")
+@click.option("--spec", default="testbed/openapi.json", help="Path to OpenAPI spec")
+def check_guardrails_cmd(
+    code_file: str = typer.Option("tests/generated/test_order_service.py", "--code-file", "-f", help="Path to code or test file to analyze"),
+    spec: str = typer.Option("testbed/openapi.json", "--spec", "-s", help="Path to OpenAPI spec"),
+):
+    """Run Safety Guardrails verification on generated tests or source code."""
+    from testpilot.guardrails.engine import SafetyGuardrailEngine
+
+    console.print(Panel.fit(f"[bold cyan]TestPilot Safety Guardrails Inspection[/bold cyan]\nTarget: [bold yellow]{code_file}[/bold yellow]"))
+    engine = SafetyGuardrailEngine(spec_path=spec)
+    result = engine.check_file(code_file)
+
+    table = Table(title="Guardrail Verification Subsystem", show_lines=True)
+    table.add_column("Guardrail Check", style="bold cyan", width=30)
+    table.add_column("Status", width=16)
+    table.add_column("Details", style="dim")
+
+    # 1. AST Code Safety
+    code_safe = result.details.get("code_safety_passed", False)
+    table.add_row(
+        "AST Code Safety & Imports",
+        "[bold green]PASS[/bold green]" if code_safe else "[bold red]FAIL[/bold red]",
+        "No dangerous calls or unauthorized imports" if code_safe else "Violations detected",
+    )
+
+    # 2. Spec-as-Oracle Grounding
+    spec_safe = result.details.get("spec_adherence_passed", False)
+    table.add_row(
+        "Spec Adherence & Grounding",
+        "[bold green]PASS[/bold green]" if spec_safe else "[bold red]FAIL[/bold red]",
+        "Zero hallucinated boundaries or ungrounded claims detected" if spec_safe else "Ungrounded assertions identified",
+    )
+
+    # 3. Overall Verdict
+    table.add_row(
+        "Safety Score",
+        f"[bold {'green' if result.is_valid else 'red'}]{result.safety_score * 100:.0f}%[/bold {'green' if result.is_valid else 'red'}]",
+        "COMPLIANT" if result.is_valid else f"{len(result.violations)} safety violations",
+    )
+
+    console.print(table)
+
+    if not result.is_valid:
+        console.print("[bold red]Detected Violations:[/bold red]")
+        for v in result.violations:
+            console.print(f"  [red]&bull; {v}[/red]")
+        sys.exit(1)
+    else:
+        console.print("[bold green]&check; All Safety Guardrails Satisfied. Code is safe for execution.[/bold green]")
+
+
+check_guardrails_command = check_guardrails_cmd
 
 
 if __name__ == "__main__":

@@ -23,7 +23,6 @@ seeded into the FastAPI e-commerce testbed microservice (`testbed/app/services/o
 | :--- | :--- | :---: | :---: | :---: | :---: |
 | **qwen2.5-coder:7b** | Local LLM | **100.0%** | 0.0% | 98.0% | 320 ms |
 | **Schemathesis (OpenAPI Fuzzing)** | Industry Baseline | **33.3%** | 28.5% | 0.0% | 1250 ms |
-| **Code-as-Oracle (Standard LLM)** | Industry Baseline | **0.0%** | 100.0% | 0.0% | 350 ms |
 
 ---
 
@@ -33,7 +32,6 @@ seeded into the FastAPI e-commerce testbed microservice (`testbed/app/services/o
 | :--- | :---: | :---: | :---: | :--- |
 | **qwen2.5-coder:7b** | PASS (Detected) | PASS (Detected) | PASS (Detected) | Full AST+CoT grounding enables detection of all 3 defects with zero hallucinated assertions. |
 | **Schemathesis (OpenAPI Fuzzing)** | PASS (Detected) | FAIL (Missed) | FAIL (Missed) | Fuzzes input schemas successfully catching negative total, but blind to tax rounding precision and state machine rules. |
-| **Code-as-Oracle (Standard LLM)** | FAIL (Missed) | FAIL (Missed) | FAIL (Missed) | Treats buggy implementation code as oracle; writes tests asserting $0.82 tax and negative totals, formalizing bugs as test debt. |
 
 ---
 

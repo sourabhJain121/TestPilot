@@ -7,6 +7,7 @@ and Invalid Test Assertions.
 """
 
 import json
+import os
 import re
 from enum import Enum
 from typing import Optional
@@ -131,6 +132,15 @@ Whenever the retrieved spec context does not explicitly define behavior for this
 
 Output strictly the requested JSON schema.
 """
+
+        # In CI mode, directly use the deterministic fallback arbitration
+        if os.getenv("TESTPILOT_CI_MODE", "").lower() in ("true", "1", "yes"):
+            return self._deterministic_fallback_arbitration(
+                test_name=test_name,
+                error_message=error_message,
+                spec_context=spec_context,
+                relevant_chunks=relevant_chunks,
+            )
 
         # 3. Query LLM if available
         health = self.llm.check_health()
