@@ -4,7 +4,7 @@ Executes multi-model and baseline evaluation runs and generates structured markd
 """
 
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 from rich.table import Table
 
@@ -210,16 +210,25 @@ class BenchmarkRunner:
 
 def run_benchmark(
     models: Union[str, list[str]] = "qwen2.5-coder:7b",
-    compare_baseline: Union[str, list[str]] = "schemathesis,code-as-oracle",
-    output: str = "docs/BENCHMARK_REPORT.md",
+    baselines: Optional[Union[str, list[str]]] = None,
+    output_path: Optional[str] = None,
+    compare_baseline: Optional[Union[str, list[str]]] = None,
+    output: Optional[str] = None,
 ) -> list[BenchmarkResult]:
     """
     Run empirical benchmark comparing multiple models and baselines against seeded defects.
     Module-level entrypoint for CLI and external evaluation harnesses.
     """
+    effective_baselines = (
+        baselines if baselines is not None else (compare_baseline or "schemathesis,code-as-oracle")
+    )
+    effective_output = (
+        output_path if output_path is not None else (output or "docs/BENCHMARK_REPORT.md")
+    )
     return BenchmarkRunner.run_benchmark(
         models=models,
-        baselines=compare_baseline,
-        output_path=output,
+        baselines=effective_baselines,
+        output_path=effective_output,
     )
+
 

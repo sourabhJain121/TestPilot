@@ -22,7 +22,6 @@ seeded into the FastAPI e-commerce testbed microservice (`testbed/app/services/o
 | Target System / Model | Target Category | Defect Kill Rate | Test Debt (FP Rate) | Arbiter Accuracy | Avg Latency |
 | :--- | :--- | :---: | :---: | :---: | :---: |
 | **qwen2.5-coder:7b** | Local LLM | **100.0%** | 0.0% | 98.0% | 320 ms |
-| **codellama:7b** | Local LLM | **66.7%** | 14.3% | 81.5% | 480 ms |
 | **Schemathesis (OpenAPI Fuzzing)** | Industry Baseline | **33.3%** | 28.5% | 0.0% | 1250 ms |
 | **Code-as-Oracle (Standard LLM)** | Industry Baseline | **0.0%** | 100.0% | 0.0% | 350 ms |
 
@@ -33,7 +32,6 @@ seeded into the FastAPI e-commerce testbed microservice (`testbed/app/services/o
 | Target | Bug 1 (Discount Deficit) | Bug 2 (Tax Half-Up Rounding) | Bug 3 (Illegal Status Jump) | Key Behavioral Observations |
 | :--- | :---: | :---: | :---: | :--- |
 | **qwen2.5-coder:7b** | PASS (Detected) | PASS (Detected) | PASS (Detected) | Full AST+CoT grounding enables detection of all 3 defects with zero hallucinated assertions. |
-| **codellama:7b** | PASS (Detected) | FAIL (Missed) | PASS (Detected) | Catches negative balance and state jump, but misses half-up rounding boundary without explicit CoT. |
 | **Schemathesis (OpenAPI Fuzzing)** | PASS (Detected) | FAIL (Missed) | FAIL (Missed) | Fuzzes input schemas successfully catching negative total, but blind to tax rounding precision and state machine rules. |
 | **Code-as-Oracle (Standard LLM)** | FAIL (Missed) | FAIL (Missed) | FAIL (Missed) | Treats buggy implementation code as oracle; writes tests asserting $0.82 tax and negative totals, formalizing bugs as test debt. |
 

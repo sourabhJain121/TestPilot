@@ -17,7 +17,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from testpilot.ast_engine.treesitter_parser import ASTDiffParser
-from testpilot.benchmark.runner import BenchmarkRunner, run_benchmark
+from testpilot.benchmark.runner import BenchmarkRunner
 from testpilot.core.models import PromptTechnique
 from testpilot.generator.synthesizer import PytestSynthesizer
 from testpilot.llm.client import OllamaLLMClient
@@ -463,24 +463,22 @@ def remedy(
 
 
 @cli.command(name="benchmark")
-@click.option("--models", default="qwen2.5-coder:7b", help="Comma-separated model tags to evaluate")
-@click.option("--compare-baseline", default="schemathesis,code-as-oracle", help="Baselines to run against")
-@click.option("--output", default="docs/BENCHMARK_REPORT.md", help="Markdown summary report destination")
-def benchmark_command(
-    models: str = typer.Option("qwen2.5-coder:7b", "--models", "-m", help="Comma-separated model tags to evaluate"),
-    compare_baseline: str = typer.Option("schemathesis,code-as-oracle", "--compare-baseline", "-c", help="Baselines to run against"),
-    output: str = typer.Option("docs/BENCHMARK_REPORT.md", "--output", "-o", help="Markdown summary report destination"),
+@click.option("--models", default="qwen2.5-coder:7b", help="Comma-separated model identifiers to test")
+@click.option("--compare-baseline", default="schemathesis,code-as-oracle", help="Baselines to benchmark against")
+@click.option("--output", default="docs/BENCHMARK_REPORT.md", help="Path to write the generated markdown report")
+def benchmark_cmd(
+    models: str = typer.Option("qwen2.5-coder:7b", "--models", "-m", help="Comma-separated model identifiers to test"),
+    compare_baseline: str = typer.Option("schemathesis,code-as-oracle", "--compare-baseline", "-c", help="Baselines to benchmark against"),
+    output: str = typer.Option("docs/BENCHMARK_REPORT.md", "--output", "-o", help="Path to write the generated markdown report"),
 ):
     """Run empirical benchmark comparing multiple models and baselines against seeded defects."""
-    console.print(Panel.fit("[bold cyan]TestPilot AI — Empirical Benchmark Evaluation Harness[/bold cyan]"))
-    console.print(f"[bold green]Models to evaluate:[/bold green] {models}")
-    console.print(f"[bold yellow]Baselines to compare:[/bold yellow] {compare_baseline}")
-    console.print(f"[dim]Output Report:[/dim] {output}\n")
+    from testpilot.benchmark.runner import run_benchmark  # or your benchmark evaluator module
 
+    click.echo(f"Initiating multi-model benchmark for: {models}")
     results = run_benchmark(
-        models=models,
-        compare_baseline=compare_baseline,
-        output=output,
+        models=models.split(",") if isinstance(models, str) else models,
+        baselines=compare_baseline.split(",") if isinstance(compare_baseline, str) else compare_baseline,
+        output_path=output,
     )
 
     table = BenchmarkRunner.render_rich_table(results)
@@ -494,7 +492,7 @@ def benchmark_command(
     )
 
 
-benchmark_cmd = benchmark_command
+benchmark_command = benchmark_cmd
 
 
 if __name__ == "__main__":
