@@ -134,7 +134,11 @@ Output strictly the requested JSON schema.
 """
 
         # In CI mode, directly use the deterministic fallback arbitration
-        if os.getenv("TESTPILOT_CI_MODE", "").lower() in ("true", "1", "yes"):
+        if (
+            os.getenv("TESTPILOT_CI_MODE", "").lower() in ("true", "1", "yes")
+            or os.getenv("TESTPILOT_OFFLINE_MODE", "").lower() in ("true", "1", "yes")
+            or os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes")
+        ):
             return self._deterministic_fallback_arbitration(
                 test_name=test_name,
                 error_message=error_message,

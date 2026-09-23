@@ -136,7 +136,11 @@ Rules:
     def _generate_fix(self, source_code: str, arbitration: ArbitrationResult) -> str:
         """Attempt LLM fix first; fall back to deterministic domain rule repair."""
         # If in CI mode, use deterministic domain repair directly
-        if os.getenv("TESTPILOT_CI_MODE", "").lower() in ("true", "1", "yes"):
+        if (
+            os.getenv("TESTPILOT_CI_MODE", "").lower() in ("true", "1", "yes")
+            or os.getenv("TESTPILOT_OFFLINE_MODE", "").lower() in ("true", "1", "yes")
+            or os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes")
+        ):
             pass
         else:
             # Try LLM

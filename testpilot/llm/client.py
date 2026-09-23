@@ -28,7 +28,11 @@ class OllamaLLMClient:
 
     def check_health(self) -> dict[str, Any]:
         """Verify Ollama service is reachable and return installed models."""
-        if os.getenv("TESTPILOT_CI_MODE", "").lower() in ("true", "1", "yes"):
+        if (
+            os.getenv("TESTPILOT_CI_MODE", "").lower() in ("true", "1", "yes")
+            or os.getenv("TESTPILOT_OFFLINE_MODE", "").lower() in ("true", "1", "yes")
+            or os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes")
+        ):
             return {
                 "connected": True,
                 "model_requested": self.model,
@@ -153,7 +157,11 @@ def calculate_discount(coupon_code, subtotal):
         """
         Generate completion from the local Ollama model or deterministic CI fixture.
         """
-        if os.getenv("TESTPILOT_CI_MODE", "").lower() in ("true", "1", "yes"):
+        if (
+            os.getenv("TESTPILOT_CI_MODE", "").lower() in ("true", "1", "yes")
+            or os.getenv("TESTPILOT_OFFLINE_MODE", "").lower() in ("true", "1", "yes")
+            or os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes")
+        ):
             return self._generate_ci_offline_fixture(prompt, json_format=json_format)
 
         endpoint = f"{self.base_url}/api/generate"

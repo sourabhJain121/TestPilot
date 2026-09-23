@@ -4,6 +4,7 @@ Provides terminal commands for system status, AST diff inspection,
 Sourcegraph caller navigation, Ollama prompt synthesis, and testbed verification.
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -24,6 +25,7 @@ from testpilot.llm.client import OllamaLLMClient
 from testpilot.llm.prompt_manager import PromptManager
 from testpilot.rag.arbiter import RAGArbiter
 from testpilot.rag.deterministic_engine import DeterministicBoundaryEngine
+from testpilot.rag.parser import SpecParser
 from testpilot.rag.vector_store import SpecVectorStore
 from testpilot.remediation.patcher import RemediationPatcher
 from testpilot.sourcegraph.client import SourcegraphClient
@@ -83,23 +85,178 @@ def status():
     console.print(table)
 
 
+@app.command("analyze")
+def analyze(
+    repo_path: str = typer.Option("testbed/", "--repo-path", "-r", help="Path to target repository"),
+    openapi: str = typer.Option("testbed/openapi.json", "--openapi", "-o", help="Path to target openapi.json"),
+    prd: str = typer.Option("docs/PRD.md", "--prd", "-p", help="Path to requirements Markdown"),
+):
+    """Analyze target repository, ingest OpenAPI contracts, index PRD requirements, and extract AST symbols."""
+    repo_p = Path(repo_path)
+    openapi_p = Path(openapi)
+    prd_p = Path(prd)
+
+    console.print(Panel.fit(
+        f"[bold cyan]TestPilot AI — Repository & Specification Intelligence Engine[/bold cyan]\n"
+        f"Target Repository : [bold yellow]{repo_p}[/bold yellow]\n"
+        f"OpenAPI Contract  : [bold yellow]{openapi_p}[/bold yellow]\n"
+        f"PRD Requirements  : [bold yellow]{prd_p}[/bold yellow]"
+    ))
+
+    # 1. Deterministic OpenAPI Boundary Extraction
+    console.print("\n[bold green]1. Ingesting OpenAPI Specification & Extracting Boundary Matrix...[/bold green]")
+    boundary_cases = []
+    if openapi_p.exists():
+        try:
+            boundary_cases = DeterministicBoundaryEngine.generate_boundary_matrix(str(openapi_p))
+            console.print(f"[cyan]Extracted {len(boundary_cases)} deterministic boundary constraints from {openapi_p.name}.[/cyan]")
+
+            table_bva = Table(title=f"OpenAPI Boundary Constraints Sample (First 6 of {len(boundary_cases)})", show_lines=True)
+            table_bva.add_column("Schema", style="bold green")
+            table_bva.add_column("Field", style="yellow")
+            table_bva.add_column("Constraint", style="magenta")
+            table_bva.add_column("Boundary Value", style="cyan")
+            table_bva.add_column("Expected", style="bold")
+            table_bva.add_column("Rationale", style="dim")
+
+            for c in boundary_cases[:6]:
+                table_bva.add_row(
+                    c.schema_name,
+                    c.field_name,
+                    f"{c.constraint_kind.value}={c.constraint_value}",
+                    str(c.boundary_value),
+                    "[green]VALID[/green]" if c.expected_valid else "[red]INVALID[/red]",
+                    c.rationale,
+                )
+            console.print(table_bva)
+        except Exception as e:
+            console.print(f"[yellow]OpenAPI boundary extraction encountered an issue: {e}[/yellow]")
+    else:
+        console.print(f"[yellow]Warning: OpenAPI specification not found at '{openapi}'. Skipping boundary matrix extraction.[/yellow]")
+
+    # 2. PRD Indexing into ChromaDB
+    console.print("\n[bold green]2. Indexing Specification Knowledge into ChromaDB Vector Store...[/bold green]")
+    store = SpecVectorStore()
+    chunks_to_index = []
+
+    if prd_p.exists():
+        try:
+            prd_chunks = SpecParser.parse_markdown(str(prd_p))
+            chunks_to_index.extend(prd_chunks)
+            console.print(f"[cyan]Parsed {len(prd_chunks)} semantic chunks from PRD ({prd_p.name}).[/cyan]")
+        except Exception as e:
+            console.print(f"[yellow]Could not parse PRD markdown at {prd_p}: {e}[/yellow]")
+    else:
+        console.print(f"[yellow]Warning: PRD file not found at '{prd}'.[/yellow]")
+
+    if openapi_p.exists():
+        try:
+            openapi_chunks = SpecParser.parse_openapi(str(openapi_p))
+            chunks_to_index.extend(openapi_chunks)
+            console.print(f"[cyan]Parsed {len(openapi_chunks)} semantic chunks from OpenAPI ({openapi_p.name}).[/cyan]")
+        except Exception as e:
+            console.print(f"[yellow]Could not parse OpenAPI chunks at {openapi_p}: {e}[/yellow]")
+
+    if chunks_to_index:
+        try:
+            indexed_count = store.index_chunks(chunks_to_index)
+            console.print(f"[bold green]Successfully indexed {indexed_count} specification chunks into persistent ChromaDB ({store.persist_directory}).[/bold green]")
+        except Exception as e:
+            console.print(f"[yellow]ChromaDB indexing encountered an issue: {e}[/yellow]")
+    else:
+        console.print("[yellow]No specification chunks found to index.[/yellow]")
+
+    # 3. Tree-sitter AST Symbol Extraction on --repo-path
+    console.print("\n[bold green]3. Performing Tree-sitter AST Symbol & Boundary Extraction on Repository...[/bold green]")
+
+    if not repo_p.exists():
+        console.print(f"[red]Error: Target repository path does not exist: {repo_path}[/red]")
+        raise typer.Exit(code=1)
+
+    ignored_dirs = {
+        ".git", ".venv", "venv", "env", ".env", "__pycache__",
+        ".pytest_cache", ".ruff_cache", ".chroma_db", "build",
+        "dist", "node_modules", ".tox", ".eggs"
+    }
+
+    python_files = []
+    if repo_p.is_file():
+        if repo_p.suffix == ".py":
+            python_files = [repo_p]
+    else:
+        for root, dirs, files in os.walk(repo_p):
+            dirs[:] = [d for d in dirs if d not in ignored_dirs and not d.endswith(".egg-info")]
+            for f in files:
+                if f.endswith(".py"):
+                    python_files.append(Path(root) / f)
+
+    python_files.sort()
+    console.print(f"[cyan]Discovered {len(python_files)} Python source file(s) in {repo_p}.[/cyan]")
+
+    extracted_functions = []
+    for py_file in python_files:
+        try:
+            funcs = ASTDiffParser.parse_file(str(py_file))
+            extracted_functions.extend(funcs)
+        except Exception as e:
+            console.print(f"[dim yellow]Skipped {py_file.name}: {e}[/dim yellow]")
+
+    total_params = sum(len(f.parameters) for f in extracted_functions)
+    total_branches = sum(len(f.branch_conditions) for f in extracted_functions)
+    total_bva_candidates = sum(len(f.boundary_candidates) for f in extracted_functions)
+
+    console.print(f"[cyan]Extracted {len(extracted_functions)} function symbol(s), {total_params} parameter(s), {total_branches} branch condition(s), and {total_bva_candidates} boundary candidate(s).[/cyan]")
+
+    table_ast = Table(title=f"Extracted Repository Symbols (First 10 of {len(extracted_functions)})", show_lines=True)
+    table_ast.add_column("Symbol / Function", style="bold yellow")
+    table_ast.add_column("File", style="dim", overflow="fold")
+    table_ast.add_column("Parameters", style="green")
+    table_ast.add_column("Decision Branches", style="magenta")
+    table_ast.add_column("Boundary Candidates", style="cyan")
+
+    for f in extracted_functions[:10]:
+        param_str = ", ".join(f"{p.name}: {p.type_annotation or 'Any'}" for p in f.parameters[:4]) or "None"
+        branch_str = "\n".join(f.branch_conditions[:2]) or "None"
+        boundary_str = "\n".join(f"[{b.boundary_type}] {b.suggested_value}" for b in f.boundary_candidates[:3]) or "None"
+        rel_path = f.file_path
+        try:
+            rel_path = str(Path(f.file_path).relative_to(repo_p))
+        except Exception:
+            pass
+        table_ast.add_row(f.name, rel_path, param_str, branch_str, boundary_str)
+
+    console.print(table_ast)
+
+    # 4. Summary
+    console.print(Panel(
+        f"[bold green]Repository & Contract Analysis Complete[/bold green]\n"
+        f"• Target Repository       : {repo_p}\n"
+        f"• Python Files Parsed     : {len(python_files)}\n"
+        f"• AST Symbols Extracted   : {len(extracted_functions)}\n"
+        f"• Boundary Candidates     : {total_bva_candidates}\n"
+        f"• OpenAPI Constraints     : {len(boundary_cases)}\n"
+        f"• ChromaDB Chunks Indexed : {len(chunks_to_index)}"
+    ))
+
+
 @app.command()
 def parse_diff(
-    file: Optional[str] = typer.Option(None, "--file", "-f", help="Target python file to parse directly"),
+    file: Optional[Path] = typer.Option(Path("testbed/app/services/order_service.py"), "--file", "-f", help="Target python file to parse directly"),
     diff: Optional[str] = typer.Option(None, "--diff", "-d", help="Git diff text or unified diff file"),
 ):
     """Parse AST function definitions, decision branch nodes, and boundary values."""
-    if file:
-        console.print(f"[bold cyan]Parsing AST for target file:[/bold cyan] {file}")
-        funcs = ASTDiffParser.parse_file(file)
-    elif diff:
+    if diff:
         diff_text = Path(diff).read_text() if Path(diff).exists() else diff
         console.print("[bold cyan]Parsing AST from unified git diff...[/bold cyan]")
         analysis = ASTDiffParser.parse_diff(diff_text)
         funcs = analysis.modified_functions
+    elif file:
+        console.print(f"[bold cyan]Parsing AST for target file:[/bold cyan] {file}")
+        funcs = ASTDiffParser.parse_file(str(file))
     else:
-        console.print("[red]Error: Please specify either --file or --diff[/red]")
-        raise typer.Exit(code=1)
+        default_file = Path("testbed/app/services/order_service.py")
+        console.print(f"[bold cyan]Parsing AST for target file:[/bold cyan] {default_file}")
+        funcs = ASTDiffParser.parse_file(str(default_file))
 
     table = Table(title=f"Discovered Functions ({len(funcs)})", show_lines=True)
     table.add_column("Function Name", style="bold yellow")
@@ -118,7 +275,7 @@ def parse_diff(
 
 @app.command()
 def check_sourcegraph(
-    function_name: str = typer.Argument(..., help="Name of the function to trace callers for"),
+    function_name: str = typer.Argument("calculate_order_totals", help="Name of the function to trace callers for"),
     file: Optional[str] = typer.Option(None, "--file", "-f", help="Path to the file defining the function"),
 ):
     """Find caller references and blast radius using Sourcegraph GraphQL or local AST fallback."""
@@ -143,16 +300,28 @@ def check_sourcegraph(
     console.print(table)
 
 
-@app.command()
+@app.command("generate-tests")
 def generate_tests(
     file: str = typer.Option("testbed/app/services/order_service.py", "--file", "-f", help="File to generate tests for"),
     technique: str = typer.Option("cot", "--technique", "-t", help="Prompt technique: zero-shot, few-shot, cot"),
-    output: str = typer.Option("tests/generated/test_order_service.py", "--output", "-o", help="Output pytest file path"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Explicit output pytest file path (overrides --output-dir)"),
+    openapi: str = typer.Option("testbed/openapi.json", "--openapi", help="Path to OpenAPI JSON specification"),
+    output_dir: str = typer.Option("tests/generated/", "--output-dir", help="Destination directory for synthesized pytest files"),
 ):
     """Generate boundary value unit tests using AST extraction and local Ollama Qwen2.5-Coder."""
     technique_enum = PromptTechnique(technique)
+    
+    if output:
+        dest_path = Path(output)
+    else:
+        file_stem = Path(file).stem if file else "order_service"
+        dest_path = Path(output_dir) / f"test_{file_stem}.py"
+
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    out_target = str(dest_path)
+
     console.print(f"[bold green]Initiating test synthesis for:[/bold green] {file}")
-    console.print(f"[dim]Technique: {technique_enum.value.upper()} | Model: qwen2.5-coder:7b[/dim]")
+    console.print(f"[dim]Technique: {technique_enum.value.upper()} | Model: qwen2.5-coder:7b | OpenAPI: {openapi}[/dim]")
 
     # 1. Parse AST
     funcs = ASTDiffParser.parse_file(file)
@@ -178,6 +347,22 @@ def generate_tests(
         "6. Negative Boundary Values: CartItem unit_price must be > 0.0. Any negative price input must assert pytest.raises(ValidationError).\n"
         "7. State Machine: CANCELLED and COMPLETED are terminal states. Transitions from CANCELLED are prohibited."
     )
+
+    if openapi and Path(openapi).exists():
+        try:
+            b_cases = DeterministicBoundaryEngine.generate_boundary_matrix(openapi)
+            sample_constraints = "\n".join(
+                f"- {c.schema_name}.{c.field_name}: {c.constraint_kind.value}={c.constraint_value} (expected_valid={c.expected_valid})"
+                for c in b_cases[:8]
+            )
+            spec_summary = (
+                f"DOMAIN CONTRACT & SPECIFICATION RULES (Extracted from {openapi}):\n"
+                f"Total Extracted Schema Boundary Rules: {len(b_cases)}\n"
+                f"{sample_constraints}\n\n"
+                + spec_summary
+            )
+        except Exception:
+            pass
 
     # 3. Build Prompt for primary target functions
     primary_func = funcs[0]
@@ -278,16 +463,22 @@ def generate_tests(
         )
 
     # 5. Synthesize clean Pytest test code
-    PytestSynthesizer.synthesize_suite(suite, output_path=output)
-    console.print(Panel(f"[bold green]Successfully generated test suite at:[/bold green] {output}\nTests Synthesized: {len(suite.test_cases)}"))
+    PytestSynthesizer.synthesize_suite(suite, output_path=out_target)
+    console.print(Panel(f"[bold green]Successfully generated test suite at:[/bold green] {out_target}\nTests Synthesized: {len(suite.test_cases)}"))
 
 
 @app.command("generate-deterministic")
 def generate_deterministic(
-    spec: str = typer.Option("testbed/openapi.json", "--spec", "-s", help="Path to OpenAPI JSON specification"),
-    output: str = typer.Option("tests/generated/test_deterministic_boundaries.py", "--output", "-o", help="Output pytest file path"),
+    spec: str = typer.Option("testbed/openapi.json", "--spec", "--openapi", "-s", help="Path to OpenAPI JSON specification"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output pytest file path (overrides --output-dir)"),
+    output_dir: str = typer.Option("tests/generated/", "--output-dir", help="Destination directory for synthesized pytest files"),
 ):
     """Generate deterministic boundary value tests directly from OpenAPI schema constraints without LLM inference."""
+    if output:
+        dest_output = output
+    else:
+        dest_output = str(Path(output_dir) / "test_deterministic_boundaries.py")
+
     console.print(Panel.fit("[bold cyan]TestPilot AI — Deterministic OpenAPI Boundary Matrix Generator[/bold cyan]"))
     console.print(f"[bold green]Parsing OpenAPI specification:[/bold green] {spec}")
 
@@ -314,14 +505,33 @@ def generate_deterministic(
 
     console.print(table)
 
-    code = DeterministicBoundaryEngine.synthesize_pytest_suite(spec_path=spec, output_path=output)
+    code = DeterministicBoundaryEngine.synthesize_pytest_suite(spec_path=spec, output_path=dest_output)
     console.print(
         Panel(
-            f"[bold green]Successfully synthesized deterministic test suite at:[/bold green] {output}\n"
+            f"[bold green]Successfully synthesized deterministic test suite at:[/bold green] {dest_output}\n"
             f"Total Boundaries Extracted: {len(cases)}\n"
             f"Test File Size: {len(code)} bytes"
         )
     )
+
+
+@app.command("generate-boundaries")
+def generate_boundaries(
+    openapi: str = typer.Option("testbed/openapi.json", "--openapi", "--spec", "-s", help="Path to OpenAPI JSON specification"),
+    output_dir: str = typer.Option("tests/generated/", "--output-dir", help="Destination directory for synthesized pytest files"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Explicit output pytest file path (overrides --output-dir)"),
+):
+    """Generate deterministic boundary value tests directly from OpenAPI schema constraints without LLM inference (alias/callback for generate-deterministic)."""
+    if output:
+        dest_output = output
+    else:
+        dest_output = str(Path(output_dir) / "test_deterministic_boundaries.py")
+
+    generate_deterministic(spec=openapi, output=dest_output, output_dir=output_dir)
+
+
+generate_boundaries_cmd = generate_boundaries
+analyze_cmd = analyze
 
 
 @app.command()
