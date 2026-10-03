@@ -17,31 +17,98 @@ class LocalCodeGraphFallback:
     """
     Zero-dependency AST-driven call graph generator that indexes symbol references
     across the repository when Sourcegraph OSS is not running.
+    Resolves imported symbols, aliases, and receiver modules to prevent false matches.
     """
 
     def __init__(self, repo_root: str = "."):
-        self.repo_root = Path(repo_root)
+        self.repo_root = Path(repo_root).resolve()
 
-    def find_callers(self, target_function_name: str, target_file_path: Optional[str] = None) -> list[dict[str, Any]]:
-        """Scan all Python files in the repo and find functions or methods that call target_function_name."""
+    @staticmethod
+    def _module_matches_path(module_str: str, file_path: Optional[str]) -> bool:
+        """Determines if an imported module name could correspond to the given target file path."""
+        if not file_path or not module_str:
+            return True
+        norm_path = file_path.replace("\\", "/").rstrip(".py")
+        path_parts = [p for p in norm_path.split("/") if p]
+        mod_parts = [m for m in module_str.split(".") if m]
+        if not mod_parts or not path_parts:
+            return True
+        mod_joined = ".".join(mod_parts)
+        path_joined = ".".join(path_parts)
+        return (
+            mod_joined in path_joined
+            or path_joined.endswith(mod_joined)
+            or mod_joined.endswith(path_joined)
+            or mod_parts[-1] == path_parts[-1]
+        )
+
+    GENERIC_METHOD_NAMES = {
+        "run", "close", "status", "execute", "start", "stop", "reset", "clear",
+        "get", "set", "update", "delete", "handle", "process", "validate",
+    }
+
+    def find_callers(
+        self,
+        target_function_name: str,
+        target_file_path: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Scan all Python files in the repo and find functions or methods that call target_function_name.
+        Resolves Python imports and aliases where possible and distinguishes confirmed from ambiguous matches.
+        """
         callers: list[dict[str, Any]] = []
+        norm_target_path = None
+        if target_file_path:
+            norm_target_path = target_file_path.replace("\\", "/").lstrip("./")
 
         for py_file in self.repo_root.rglob("*.py"):
-            # Skip hidden, virtual environments and cache
             parts = py_file.parts
-            if any(p.startswith(".") or p in ("venv", "env", "site-packages", "htmlcov") for p in parts):
+            if any(p.startswith(".") or p in ("venv", "env", "site-packages", "htmlcov", ".venv") for p in parts):
                 continue
 
             try:
                 source = py_file.read_text(encoding="utf-8")
+                # Fast pre-filter: if target_function_name not in source, skip ast.parse
+                if target_function_name not in source:
+                    continue
                 tree = ast.parse(source, filename=str(py_file))
             except Exception:
                 continue
 
+            try:
+                rel_path = str(py_file.relative_to(self.repo_root)).replace("\\", "/")
+            except ValueError:
+                rel_path = str(py_file).replace("\\", "/")
+
+            # Step 1: Collect imported symbols and aliases in this file
+            # Format: local_symbol_name -> {"source_module": str, "original_symbol": str}
+            imported_symbols: dict[str, dict[str, str]] = {}
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        as_name = alias.asname or alias.name
+                        imported_symbols[as_name] = {
+                            "source_module": alias.name,
+                            "original_symbol": alias.name.split(".")[-1],
+                        }
+                elif isinstance(node, ast.ImportFrom):
+                    mod_name = node.module or ""
+                    for alias in node.names:
+                        as_name = alias.asname or alias.name
+                        imported_symbols[as_name] = {
+                            "source_module": mod_name,
+                            "original_symbol": alias.name,
+                        }
+
+            is_same_file = bool(norm_target_path and (rel_path == norm_target_path or rel_path.endswith(norm_target_path)))
+
             class CallVisitor(ast.NodeVisitor):
-                def __init__(self, target_name: str, file_rel_path: str):
-                    self.target_name = target_name
-                    self.file_rel_path = file_rel_path
+                def __init__(self, outer_self, imported_syms, is_same, target_p, rel_p):
+                    self.outer = outer_self
+                    self.imported_symbols = imported_syms
+                    self.is_same_file = is_same
+                    self.norm_target_path = target_p
+                    self.rel_path = rel_p
                     self.scope_stack: list[str] = []
 
                 def visit_FunctionDef(self, node: ast.FunctionDef):
@@ -55,31 +122,120 @@ class LocalCodeGraphFallback:
                     self.scope_stack.pop()
 
                 def visit_Call(self, node: ast.Call):
-                    # Check if the call matches target_name
-                    called_name = None
-                    if isinstance(node.func, ast.Name):
-                        called_name = node.func.id
-                    elif isinstance(node.func, ast.Attribute):
-                        called_name = node.func.attr
+                    caller_name = self.scope_stack[-1] if self.scope_stack else "<module_level>"
+                    matched = False
+                    is_ambiguous = False
+                    match_quality = "EXACT_AST_CALL"
 
-                    if called_name == self.target_name:
-                        current_caller = self.scope_stack[-1] if self.scope_stack else "<module_level>"
+                    # Case 1: Simple Name call: func(...) or aliased_func(...)
+                    if isinstance(node.func, ast.Name):
+                        called_id = node.func.id
+                        if called_id in self.imported_symbols:
+                            info = self.imported_symbols[called_id]
+                            if info["original_symbol"] == target_function_name:
+                                # Check if source module matches target file
+                                if self.norm_target_path:
+                                    if self.outer._module_matches_path(info["source_module"], self.norm_target_path):
+                                        matched = True
+                                        match_quality = "CONFIRMED_IMPORT_CALL"
+                                    else:
+                                        # Imported from an unrelated module with same function name
+                                        matched = False
+                                else:
+                                    matched = True
+                                    match_quality = "CONFIRMED_IMPORT_CALL"
+                        elif called_id == target_function_name:
+                            if self.is_same_file:
+                                matched = True
+                                match_quality = "SAME_FILE_AST_CALL"
+                            elif self.norm_target_path:
+                                # Name matches, but not imported and not same file
+                                matched = True
+                                is_ambiguous = True
+                                match_quality = "AMBIGUOUS_NAME_MATCH"
+                            else:
+                                matched = True
+                                match_quality = "EXACT_AST_CALL"
+
+                    # Case 2: Attribute call: receiver.attr(...)
+                    elif isinstance(node.func, ast.Attribute):
+                        attr_name = node.func.attr
+                        if attr_name == target_function_name:
+                            receiver = node.func.value
+                            if isinstance(receiver, ast.Name):
+                                rec_name = receiver.id
+                                if self.is_same_file and rec_name in ("self", "cls"):
+                                    matched = True
+                                    match_quality = "SAME_FILE_CLASS_CALL"
+                                elif rec_name in self.imported_symbols:
+                                    info = self.imported_symbols[rec_name]
+                                    if self.norm_target_path:
+                                        if self.outer._module_matches_path(info["source_module"], self.norm_target_path):
+                                            matched = True
+                                            match_quality = "CONFIRMED_CLASS_METHOD_CALL"
+                                        else:
+                                            # Receiver was imported from unrelated module
+                                            matched = False
+                                    else:
+                                        matched = True
+                                        match_quality = "CONFIRMED_CLASS_METHOD_CALL"
+                                else:
+                                    # Receiver is local variable or unknown object (e.g. runner.run())
+                                    if target_function_name in LocalCodeGraphFallback.GENERIC_METHOD_NAMES:
+                                        # Do not treat unrelated object.run() / object.close() as callers
+                                        matched = False
+                                    elif self.norm_target_path:
+                                        matched = True
+                                        is_ambiguous = True
+                                        match_quality = "AMBIGUOUS_ATTRIBUTE_CALL"
+                                    else:
+                                        matched = True
+                                        is_ambiguous = True
+                                        match_quality = "AMBIGUOUS_ATTRIBUTE_CALL"
+                            elif isinstance(receiver, ast.Attribute):
+                                # E.g., pkg.module.func(...)
+                                full_attr = self._unparse_node(receiver)
+                                if self.norm_target_path and self.outer._module_matches_path(full_attr, self.norm_target_path):
+                                    matched = True
+                                    match_quality = "CONFIRMED_QUALIFIED_CALL"
+                                else:
+                                    if target_function_name in LocalCodeGraphFallback.GENERIC_METHOD_NAMES:
+                                        matched = False
+                                    else:
+                                        matched = True
+                                        is_ambiguous = True
+                                        match_quality = "AMBIGUOUS_ATTRIBUTE_CALL"
+                            else:
+                                if target_function_name in LocalCodeGraphFallback.GENERIC_METHOD_NAMES:
+                                    matched = False
+                                else:
+                                    matched = True
+                                    is_ambiguous = True
+                                    match_quality = "AMBIGUOUS_ATTRIBUTE_CALL"
+
+                    if matched:
                         callers.append(
                             {
-                                "caller_name": current_caller,
-                                "file_path": self.file_rel_path,
+                                "caller_name": caller_name,
+                                "file_path": self.rel_path,
                                 "line_number": node.lineno,
                                 "source_type": "local_ast_fallback",
+                                "is_ambiguous": is_ambiguous,
+                                "confidence": "AMBIGUOUS" if is_ambiguous else "CONFIRMED",
+                                "match_quality": match_quality,
                             }
                         )
+
                     self.generic_visit(node)
 
-            try:
-                rel_path = str(py_file.relative_to(self.repo_root))
-            except ValueError:
-                rel_path = str(py_file)
+                @staticmethod
+                def _unparse_node(node: ast.AST) -> str:
+                    try:
+                        return ast.unparse(node)
+                    except Exception:
+                        return ""
 
-            visitor = CallVisitor(target_function_name, rel_path)
+            visitor = CallVisitor(self, imported_symbols, is_same_file, norm_target_path, rel_path)
             visitor.visit(tree)
 
         return callers

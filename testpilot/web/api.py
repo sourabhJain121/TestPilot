@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +18,11 @@ from pydantic import BaseModel
 
 from testpilot.ast_engine.treesitter_parser import ASTDiffParser
 from testpilot.benchmark.runner import run_benchmark
+from testpilot.evolution import (
+    EvolutionRequest,
+    InvalidGitReferenceError,
+    RepositoryEvolutionEngine,
+)
 from testpilot.guardrails.engine import SafetyGuardrailEngine
 from testpilot.llm.client import OllamaLLMClient
 from testpilot.rag.arbiter import RAGArbiter
@@ -384,7 +389,82 @@ def get_guardrails_audit() -> dict[str, Any]:
     }
 
 
-# 9. Static Files & Root Route
+# 9. Repository Evolution Intelligence
+@app.post("/api/evolution/analyze")
+def analyze_evolution(request: EvolutionRequest) -> dict[str, Any]:
+    """
+    Run Repository Evolution Intelligence analysis.
+    Identifies changed symbols across git diff, computes multi-hop transitive blast radius,
+    and prioritizes existing tests based on call-site coupling and failure likelihood.
+    """
+    try:
+        engine = RepositoryEvolutionEngine(repo_root=request.repo_path)
+        report = engine.analyze(request)
+        return report.model_dump()
+    except InvalidGitReferenceError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Evolution analysis failed: {str(e)}") from e
+
+
+@app.get("/api/evolution/refs")
+def get_git_refs() -> dict[str, Any]:
+    """Retrieve available Git branches, tags, and recent commit history for analysis selection."""
+    branches: list[str] = []
+    commits: list[dict[str, str]] = []
+    current_branch = "main"
+
+    try:
+        cur_proc = subprocess.run(
+            ["git", "branch", "--show-current"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if cur_proc.returncode == 0 and cur_proc.stdout.strip():
+            current_branch = cur_proc.stdout.strip()
+
+        branch_proc = subprocess.run(
+            ["git", "branch", "-a"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if branch_proc.returncode == 0:
+            for line in branch_proc.stdout.splitlines():
+                b = line.replace("*", "").strip()
+                if b and not b.startswith("remotes/origin/HEAD"):
+                    branches.append(b)
+
+        log_proc = subprocess.run(
+            ["git", "log", "-n", "8", "--oneline"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if log_proc.returncode == 0:
+            for line in log_proc.stdout.splitlines():
+                parts = line.split(" ", 1)
+                if len(parts) == 2:
+                    commits.append({"hash": parts[0], "message": parts[1]})
+                elif len(parts) == 1 and parts[0]:
+                    commits.append({"hash": parts[0], "message": ""})
+    except Exception:
+        pass
+
+    return {
+        "current_branch": current_branch,
+        "branches": sorted(set(branches)),
+        "recent_commits": commits,
+        "presets": [
+            {"label": "Working Tree vs HEAD", "base_ref": "HEAD", "target_ref": None},
+            {"label": "Last Commit (HEAD~1..HEAD)", "base_ref": "HEAD~1", "target_ref": "HEAD"},
+            {"label": "Branch vs main", "base_ref": "main", "target_ref": None},
+        ],
+    }
+
+
+# 10. Static Files & Root Route
 static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")

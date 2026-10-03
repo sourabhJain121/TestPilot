@@ -197,6 +197,10 @@
         <i data-lucide="shield-check" class="w-4 h-4"></i>
         <span>Safety Guardrails</span>
       </button>
+      <button onclick="switchTab('evolution')" id="tab-btn-evolution" class="tab-btn flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-850 transition">
+        <i data-lucide="git-pull-request" class="w-4 h-4"></i>
+        <span>Repo Evolution</span>
+      </button>
     </div>
   </nav>
 
@@ -787,6 +791,191 @@
           <i data-lucide="shield" class="w-8 h-8 mx-auto text-slate-600 mb-2"></i>
           <span>Click "Run Guardrails Check" to verify test code against Course Safety Guardrails.</span>
         </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 9: REPOSITORY EVOLUTION INTELLIGENCE                              -->
+    <!-- ===================================================================== -->
+    <div id="tab-evolution" class="tab-panel hidden space-y-6">
+      <!-- Control Bar -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+        <div>
+          <h3 class="font-semibold text-sm text-white flex items-center space-x-2">
+            <i data-lucide="git-pull-request" class="w-4 h-4 text-cyan-400"></i>
+            <span>Repository Evolution Intelligence</span>
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Transitive blast-radius propagation across AST call-graphs with failure-likelihood test prioritization</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Preset selector -->
+          <select id="evo-preset" onchange="applyEvolutionPreset(this.value)" class="bg-slate-950 border border-slate-700 text-xs px-2.5 py-1.5 rounded-lg text-slate-300 font-mono focus:outline-none focus:border-cyan-500">
+            <option value="last_commit">Last Commit (HEAD~1 &rarr; HEAD)</option>
+            <option value="working_tree">Working Tree vs HEAD</option>
+            <option value="branch_main">Feature vs main</option>
+            <option value="custom">Custom Refs</option>
+          </select>
+
+          <!-- Base Ref -->
+          <div class="flex items-center space-x-1 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs">
+            <span class="text-slate-500 font-mono text-[10px]">Base:</span>
+            <input type="text" id="evo-base-ref" value="HEAD~1" class="bg-transparent border-none text-xs font-mono text-cyan-300 w-24 focus:outline-none">
+          </div>
+
+          <!-- Target Ref -->
+          <div class="flex items-center space-x-1 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs">
+            <span class="text-slate-500 font-mono text-[10px]">Target:</span>
+            <input type="text" id="evo-target-ref" value="HEAD" placeholder="Working Tree" class="bg-transparent border-none text-xs font-mono text-cyan-300 w-24 focus:outline-none">
+          </div>
+
+          <!-- Max Depth -->
+          <div class="flex items-center space-x-1 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs">
+            <span class="text-slate-500 font-mono text-[10px]">Depth:</span>
+            <select id="evo-max-depth" class="bg-transparent border-none text-xs font-mono text-cyan-300 focus:outline-none">
+              <option value="1">1 (Direct)</option>
+              <option value="2">2 (Transitive)</option>
+              <option value="3" selected>3 (Deep)</option>
+              <option value="4">4 (Broad)</option>
+              <option value="5">5 (Max)</option>
+            </select>
+          </div>
+
+          <!-- Analyze Button -->
+          <button onclick="runEvolutionAnalysis()" id="btn-run-evolution" class="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-medium transition shadow-md shadow-cyan-500/20">
+            <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+            <span>Analyze Evolution</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Metrics Row -->
+      <div id="evo-kpi-container" class="grid grid-cols-2 md:grid-cols-6 gap-3">
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+          <div class="text-[11px] text-slate-400">Files Changed</div>
+          <div id="evo-kpi-files" class="text-xl font-bold font-mono text-cyan-400">--</div>
+          <div class="text-[10px] text-slate-500 font-mono" id="evo-kpi-diffstat">In diff range</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+          <div class="text-[11px] text-slate-400">AST Symbols Modified</div>
+          <div id="evo-kpi-symbols" class="text-xl font-bold font-mono text-amber-400">--</div>
+          <div class="text-[10px] text-slate-500 font-mono">Functions & methods</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+          <div class="text-[11px] text-slate-400">Transitive Blast Radius</div>
+          <div id="evo-kpi-radius" class="text-xl font-bold font-mono text-purple-400">--</div>
+          <div class="text-[10px] text-slate-500 font-mono" id="evo-kpi-direct-indirect">Direct & Indirect</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+          <div class="text-[11px] text-slate-400">Prioritized Tests</div>
+          <div id="evo-kpi-tests" class="text-xl font-bold font-mono text-emerald-400">--</div>
+          <div class="text-[10px] text-slate-500 font-mono" id="evo-kpi-tiers">Ranked by risk</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+          <div class="text-[11px] text-slate-400">Event Candidates</div>
+          <div id="evo-kpi-candidates" class="text-xl font-bold font-mono text-amber-400">--</div>
+          <div class="text-[10px] text-slate-500 font-mono" id="evo-kpi-candidates-sub">Unconfirmed triggers</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+          <div class="text-[11px] text-slate-400">Analysis Latency</div>
+          <div id="evo-kpi-latency" class="text-xl font-bold font-mono text-slate-200">-- ms</div>
+          <div class="text-[10px] text-slate-500 font-mono">AST & Graph query</div>
+        </div>
+      </div>
+
+      <!-- Recommended Fast-Feedback Command Bar -->
+      <div id="evo-command-banner" class="hidden p-4 rounded-xl bg-gradient-to-r from-cyan-950/70 via-slate-900 to-indigo-950/70 border border-cyan-800/60 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+            <i data-lucide="zap" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="text-xs font-semibold text-white flex items-center space-x-2">
+              <span>Fast-Feedback Test Command</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800">Critical Regression Suite</span>
+            </div>
+            <p class="text-[11px] font-mono text-slate-300 truncate max-w-2xl mt-0.5" id="evo-fast-cmd-text">pytest tests/test_... -v</p>
+          </div>
+        </div>
+        <button onclick="copyFastTestCommand()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-cyan-600/80 hover:bg-cyan-500 text-white text-xs font-medium transition self-start md:self-auto">
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          <span id="btn-copy-fast-cmd">Copy Command</span>
+        </button>
+      </div>
+
+      <!-- Main Dual Panel: Left = Changed Symbols & Impact Graph; Right = Prioritized Tests -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left: Changed Symbols & Blast Radius Tree (7 Cols) -->
+        <div class="lg:col-span-7 space-y-6">
+          <!-- Changed Symbols Sub-card -->
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold text-white flex items-center space-x-2">
+                <i data-lucide="diff" class="w-4 h-4 text-amber-400"></i>
+                <span>Changed Python Symbols (Hunk Intersection)</span>
+              </h4>
+              <span id="evo-changed-count" class="text-[11px] font-mono text-slate-400">0 symbols</span>
+            </div>
+            <div id="evo-changed-symbols-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+              <div class="p-4 text-center text-slate-500 text-xs bg-slate-950/40 rounded-lg">Run analysis to inspect changed AST symbols.</div>
+            </div>
+          </div>
+
+          <!-- Transitive Blast Radius Tree Sub-card -->
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h4 class="text-xs font-bold text-white flex items-center space-x-2">
+                <i data-lucide="share-2" class="w-4 h-4 text-purple-400"></i>
+                <span>Transitive Call-Graph Blast Radius</span>
+              </h4>
+              <div class="flex items-center space-x-2">
+                <div class="flex bg-slate-950 border border-slate-800 rounded-lg p-0.5 text-[10px] font-mono">
+                  <button id="evo-filter-all" onclick="filterEvoImpacts('all')" class="px-2 py-0.5 rounded bg-slate-800 text-white font-medium">All</button>
+                  <button id="evo-filter-confirmed" onclick="filterEvoImpacts('confirmed')" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">Confirmed</button>
+                  <button id="evo-filter-uncertain" onclick="filterEvoImpacts('uncertain')" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">Uncertain</button>
+                </div>
+                <span id="evo-blast-count" class="text-[11px] font-mono text-slate-400">0 downstream callers</span>
+              </div>
+            </div>
+            <div id="evo-impact-graph-list" class="space-y-2 max-h-96 overflow-y-auto pr-1">
+              <div class="p-4 text-center text-slate-500 text-xs bg-slate-950/40 rounded-lg">Run analysis to trace multi-hop call ripple effects.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Prioritized Tests & Event Candidates (5 Cols) -->
+        <div class="lg:col-span-5 space-y-4">
+          <!-- Confirmed Regression Tests -->
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold text-white flex items-center space-x-2">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+                <span>Prioritized Regression Tests</span>
+              </h4>
+              <span id="evo-tests-count" class="text-[11px] font-mono text-emerald-400 font-semibold">0 tests</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Confirmed regression tests ranked by direct symbol coupling, behavioral coverage, and failure risk.</p>
+            <div id="evo-prioritized-tests-list" class="space-y-2.5 max-h-[450px] overflow-y-auto pr-1">
+              <div class="p-6 text-center text-slate-500 text-xs bg-slate-950/40 rounded-lg">No prioritized tests yet identified.</div>
+            </div>
+          </div>
+
+          <!-- Possible Event-Trigger Candidates -->
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold text-white flex items-center space-x-2">
+                <i data-lucide="help-circle" class="w-4 h-4 text-amber-400"></i>
+                <span>Event-Trigger Candidates</span>
+              </h4>
+              <span id="evo-candidates-count" class="text-[11px] font-mono text-amber-400 font-semibold">0 candidates</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Tests that invoke event triggers (e.g. migrate) without confirmed behavioral coverage of the changed code.</p>
+            <div id="evo-candidates-list" class="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
+              <div class="p-4 text-center text-slate-500 text-xs bg-slate-950/40 rounded-lg">No unconfirmed event candidates.</div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -1441,6 +1630,387 @@
 
     function escapeHtml(str) {
       return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // =========================================================================
+    // REPOSITORY EVOLUTION INTELLIGENCE CONTROLLER
+    // =========================================================================
+    function applyEvolutionPreset(preset) {
+      const baseInput = document.getElementById('evo-base-ref');
+      const targetInput = document.getElementById('evo-target-ref');
+      if (preset === 'last_commit') {
+        baseInput.value = 'HEAD~1';
+        targetInput.value = 'HEAD';
+      } else if (preset === 'working_tree') {
+        baseInput.value = 'HEAD';
+        targetInput.value = '';
+      } else if (preset === 'branch_main') {
+        baseInput.value = 'main';
+        targetInput.value = '';
+      }
+    }
+
+    let currentFastTestCommand = '';
+    let currentEvolutionData = null;
+    let currentImpactFilter = 'all';
+
+    function copyFastTestCommand() {
+      if (!currentFastTestCommand) return;
+      navigator.clipboard.writeText(currentFastTestCommand);
+      const btn = document.getElementById('btn-copy-fast-cmd');
+      const old = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = old; }, 2000);
+      logTerminal('INFO', `Copied fast-feedback test command to clipboard.`);
+    }
+
+    function copyTestCmd(cmd) {
+      navigator.clipboard.writeText(cmd);
+      logTerminal('INFO', `Copied pytest command: ${cmd}`);
+    }
+
+    function filterEvoImpacts(filterType) {
+      currentImpactFilter = filterType;
+      ['all', 'confirmed', 'uncertain'].forEach(t => {
+        const btn = document.getElementById(`evo-filter-${t}`);
+        if (!btn) return;
+        if (t === filterType) {
+          btn.className = "px-2 py-0.5 rounded bg-slate-800 text-white font-medium";
+        } else {
+          btn.className = "px-2 py-0.5 rounded text-slate-400 hover:text-white";
+        }
+      });
+      renderEvoImpacts();
+    }
+
+    function toggleEvidence(drawerId) {
+      const el = document.getElementById(drawerId);
+      if (el) {
+        el.classList.toggle('hidden');
+      }
+    }
+
+    function renderEvoImpacts() {
+      const impactList = document.getElementById('evo-impact-graph-list');
+      if (!currentEvolutionData) return;
+      const allImpacts = [...(currentEvolutionData.direct_impacts || []), ...(currentEvolutionData.indirect_impacts || [])];
+      
+      let filtered = allImpacts;
+      if (currentImpactFilter === 'confirmed') {
+        filtered = allImpacts.filter(n => n.is_confirmed !== false && (n.uncertainty_score || 0) < 0.40);
+      } else if (currentImpactFilter === 'uncertain') {
+        filtered = allImpacts.filter(n => n.is_confirmed === false || (n.uncertainty_score || 0) >= 0.40);
+      }
+
+      const blastCountEl = document.getElementById('evo-blast-count');
+      if (blastCountEl) {
+        blastCountEl.textContent = `${filtered.length} of ${allImpacts.length} callers`;
+      }
+
+      if (filtered.length > 0) {
+        impactList.innerHTML = filtered.map((node, idx) => {
+          const isDirect = node.impact_type === 'DIRECT';
+          const isConfirmed = node.is_confirmed !== false && (node.uncertainty_score || 0) < 0.40;
+          const drawerId = `evo-evidence-${idx}`;
+
+          const hopBadge = isDirect
+            ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700'
+            : 'bg-purple-950/80 text-purple-300 border-purple-700';
+
+          const cardBorder = isDirect
+            ? 'border-emerald-900/60 bg-slate-950/70 hover:border-emerald-600/80'
+            : 'border-purple-900/60 bg-slate-950/70 hover:border-purple-600/80';
+
+          const certBadge = isConfirmed
+            ? '<span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">CONFIRMED</span>'
+            : '<span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">UNCERTAIN</span>';
+
+          const uncPct = Math.round((node.uncertainty_score || 0.1) * 100);
+          const uncColor = uncPct <= 20 ? 'text-emerald-400' : (uncPct <= 40 ? 'text-amber-400' : 'text-rose-400');
+          const rootFile = node.root_changed_file || (currentEvolutionData.changed_symbols?.find(s => s.name === node.root_changed_symbol)?.file_path || 'source');
+
+          return `
+            <div class="p-3 rounded-lg border ${cardBorder} space-y-2 text-xs transition">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2 font-mono">
+                  <span class="text-[10px] font-bold px-1.5 py-0.5 rounded border ${hopBadge}">
+                    ${isDirect ? 'Direct (1-hop)' : `Indirect (${node.depth} hops)`}
+                  </span>
+                  <span class="font-bold text-slate-100">${escapeHtml(node.symbol_name)}</span>
+                  ${certBadge}
+                </div>
+                <div class="text-[11px] font-mono ${uncColor}">
+                  Uncertainty: ${uncPct}%
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                <span>${escapeHtml(node.file_path)}</span>
+                <span class="text-slate-500">Root: <span class="text-cyan-400">${escapeHtml(node.root_changed_symbol)}</span></span>
+              </div>
+
+              <div class="text-[11px] text-slate-300 bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono flex items-center justify-between">
+                <span>${escapeHtml(node.reason)}</span>
+                <button onclick="toggleEvidence('${drawerId}')" class="text-[10px] text-cyan-400 hover:text-cyan-300 underline font-sans ml-2 shrink-0">
+                  Inspect Evidence
+                </button>
+              </div>
+
+              <!-- Interactive Evidence & Limitation Drawer -->
+              <div id="${drawerId}" class="hidden p-2.5 rounded-lg bg-slate-900/95 border border-slate-800 space-y-1.5 text-[11px] font-mono">
+                <div class="text-[10px] uppercase font-bold text-slate-400 border-b border-slate-800 pb-1 flex items-center justify-between">
+                  <span>Evidence Trail &amp; Confidence Details</span>
+                  <span class="text-slate-500">${escapeHtml(node.evidence?.evidence_source || 'AST')}</span>
+                </div>
+                <div class="text-slate-300">
+                  <span class="text-slate-500">Dependency Path:</span>
+                  <span class="text-cyan-300 font-bold">${escapeHtml(node.evidence?.call_path_description || node.evidence?.call_chain?.join(' &rarr; ') || node.symbol_name)}</span>
+                </div>
+                <div class="text-slate-300">
+                  <span class="text-slate-500">Initiating Symbol:</span>
+                  ${escapeHtml(node.root_changed_symbol)} (${escapeHtml(rootFile)})
+                </div>
+                <div class="text-slate-300">
+                  <span class="text-slate-500">Resolution Engine:</span>
+                  ${escapeHtml(node.evidence?.resolution_engine || 'local_ast_fallback')} &bull; Match: ${escapeHtml(node.evidence?.match_quality || 'EXACT_AST_CALL')}
+                </div>
+                <div class="text-slate-300">
+                  <span class="text-slate-500">Uncertainty Reason:</span>
+                  ${escapeHtml(node.uncertainty_reason || 'AST structural traversal')}
+                </div>
+                ${node.limitations && node.limitations.length > 0 ? `
+                  <div class="text-amber-400/90 pt-0.5">
+                    <span class="text-amber-500 font-bold">Limitations:</span> ${escapeHtml(node.limitations.join('; '))}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        impactList.innerHTML = `<div class="p-4 text-center text-slate-500 text-xs bg-slate-950/40 rounded-lg">No callers match filter '${currentImpactFilter}'.</div>`;
+      }
+      lucide.createIcons();
+    }
+
+    async function runEvolutionAnalysis() {
+      const baseRef = document.getElementById('evo-base-ref').value.trim() || 'HEAD~1';
+      const targetRefVal = document.getElementById('evo-target-ref').value.trim();
+      const targetRef = targetRefVal.length > 0 ? targetRefVal : null;
+      const maxDepth = parseInt(document.getElementById('evo-max-depth').value, 10) || 3;
+      const btn = document.getElementById('btn-run-evolution');
+
+      btn.disabled = true;
+      btn.classList.add('opacity-60', 'cursor-not-allowed');
+
+      logTerminal('INFO', `POST /api/evolution/analyze - Base: ${baseRef}, Target: ${targetRef || 'WORKING_TREE'}, Depth: ${maxDepth}`);
+
+      const symbolsList = document.getElementById('evo-changed-symbols-list');
+      const impactList = document.getElementById('evo-impact-graph-list');
+      const testsList = document.getElementById('evo-prioritized-tests-list');
+      const candidatesList = document.getElementById('evo-candidates-list');
+
+      symbolsList.innerHTML = `<div class="p-4 text-center text-slate-400 text-xs"><i data-lucide="loader" class="w-5 h-5 animate-spin mx-auto text-cyan-400 mb-1"></i>Extracting changed AST symbols...</div>`;
+      impactList.innerHTML = `<div class="p-4 text-center text-slate-400 text-xs"><i data-lucide="loader" class="w-5 h-5 animate-spin mx-auto text-purple-400 mb-1"></i>Traversing transitive call graph...</div>`;
+      testsList.innerHTML = `<div class="p-4 text-center text-slate-400 text-xs"><i data-lucide="loader" class="w-5 h-5 animate-spin mx-auto text-emerald-400 mb-1"></i>Prioritizing regression test suite...</div>`;
+      if (candidatesList) {
+        candidatesList.innerHTML = `<div class="p-4 text-center text-slate-400 text-xs"><i data-lucide="loader" class="w-5 h-5 animate-spin mx-auto text-amber-400 mb-1"></i>Classifying event triggers...</div>`;
+      }
+      lucide.createIcons();
+
+      try {
+        const res = await fetch('/api/evolution/analyze', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            base_ref: baseRef,
+            target_ref: targetRef,
+            max_depth: maxDepth,
+            repo_path: '.'
+          })
+        });
+        const data = await res.json();
+        lastAPIResponse = data;
+
+        // KPI Counters
+        document.getElementById('evo-kpi-files').textContent = (data.changed_files || []).length;
+        document.getElementById('evo-kpi-diffstat').textContent = `${(data.changed_files || []).length} files in scope`;
+        document.getElementById('evo-kpi-symbols').textContent = (data.changed_symbols || []).length;
+        
+        const directCount = (data.direct_impacts || []).length;
+        const indirectCount = (data.indirect_impacts || []).length;
+        document.getElementById('evo-kpi-radius').textContent = data.total_impacted_symbols || (directCount + indirectCount);
+        document.getElementById('evo-kpi-direct-indirect').textContent = `${directCount} Direct, ${indirectCount} Indirect`;
+
+        const testsCount = (data.prioritized_tests || []).length;
+        const criticalCount = (data.prioritized_tests || []).filter(t => t.priority_tier === 'CRITICAL').length;
+        const highCount = (data.prioritized_tests || []).filter(t => t.priority_tier === 'HIGH').length;
+        const candidateCount = (data.event_trigger_candidates || []).length;
+
+        document.getElementById('evo-kpi-tests').textContent = testsCount;
+        document.getElementById('evo-kpi-tiers').textContent = `${criticalCount} Critical, ${highCount} High`;
+        const kpiCand = document.getElementById('evo-kpi-candidates');
+        if (kpiCand) kpiCand.textContent = candidateCount;
+        document.getElementById('evo-kpi-latency').textContent = `${(data.analysis_latency_ms || 0).toFixed(1)} ms`;
+
+        // 1. Render Changed Symbols
+        document.getElementById('evo-changed-count').textContent = `${(data.changed_symbols || []).length} symbols`;
+        if (data.changed_symbols && data.changed_symbols.length > 0) {
+          symbolsList.innerHTML = data.changed_symbols.map(sym => {
+            const badgeBg = sym.change_type === 'DELETED' ? 'bg-rose-950 text-rose-300 border-rose-800' : (sym.change_type === 'ADDED' ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-amber-950 text-amber-300 border-amber-800');
+            return `
+              <div class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 flex items-center justify-between text-xs">
+                <div class="space-y-0.5">
+                  <div class="flex items-center space-x-2 font-mono">
+                    <span class="font-bold text-slate-100">${escapeHtml(sym.name)}</span>
+                    ${sym.class_name ? `<span class="text-[10px] text-slate-400">(${escapeHtml(sym.class_name)})</span>` : ''}
+                    <span class="text-[9px] uppercase px-1.5 py-0.5 rounded font-mono border ${badgeBg}">${sym.change_type}</span>
+                  </div>
+                  <div class="text-[11px] text-slate-400 font-mono">${escapeHtml(sym.file_path)} : L${sym.line_start}-L${sym.line_end}</div>
+                </div>
+                ${sym.parameters && sym.parameters.length > 0 ? `<div class="text-[10px] font-mono text-slate-500 hidden sm:block">(${sym.parameters.join(', ')})</div>` : ''}
+              </div>
+            `;
+          }).join('');
+        } else {
+          symbolsList.innerHTML = `<div class="p-4 text-center text-slate-500 text-xs bg-slate-950/40 rounded-lg">No Python function/method changes found in diff.</div>`;
+        }
+
+        // 2. Render Transitive Blast Radius Graph with Filter & Evidence
+        renderEvoImpacts();
+
+        // 3. Render Prioritized Tests with Selection Reason & Evidence Trail
+        document.getElementById('evo-tests-count').textContent = `${(data.prioritized_tests || []).length} tests`;
+        if (data.prioritized_tests && data.prioritized_tests.length > 0) {
+          testsList.innerHTML = data.prioritized_tests.map(test => {
+            const tierColors = {
+              'CRITICAL': 'bg-rose-950 text-rose-300 border-rose-800',
+              'HIGH': 'bg-amber-950 text-amber-300 border-amber-800',
+              'MEDIUM': 'bg-cyan-950 text-cyan-300 border-cyan-800',
+              'LOW': 'bg-slate-900 text-slate-400 border-slate-800'
+            };
+            const classBadgeMap = {
+              'BEHAVIORAL_COVERAGE': 'bg-emerald-950 text-emerald-300 border-emerald-700',
+              'EXPLICIT_EVENT_DISPATCH': 'bg-purple-950 text-purple-300 border-purple-700',
+              'EVENT_TRIGGER_CANDIDATE': 'bg-amber-950 text-amber-300 border-amber-700',
+              'NO_RELEVANT_EVENT_EVIDENCE': 'bg-slate-900 text-slate-400 border-slate-700'
+            };
+            const tierBadge = tierColors[test.priority_tier] || 'bg-slate-900 text-slate-400 border-slate-800';
+            const classBadge = test.match_classification ? `<span class="text-[9px] font-mono px-1.5 py-0.5 rounded border ${classBadgeMap[test.match_classification] || 'bg-slate-900 text-slate-400 border-slate-700'}">${escapeHtml(test.match_classification)}</span>` : '';
+            const priorityScore = (test.priority_score !== undefined) ? test.priority_score.toFixed(2) : '0.50';
+            const uncPct = Math.round((test.uncertainty_score || 0.1) * 100);
+
+            // Missing evidence block
+            let missingHtml = '';
+            if (test.missing_evidence && test.missing_evidence.length > 0) {
+              missingHtml = `<div class="text-[10px] text-amber-400/90 bg-amber-950/30 p-1.5 rounded border border-amber-900/40">
+                <span class="font-semibold text-amber-300">Uncertainty Notice:</span> ${escapeHtml(test.missing_evidence.join('; '))}
+              </div>`;
+            }
+
+            return `
+              <div class="p-3.5 rounded-lg bg-slate-950/80 border border-slate-800/90 space-y-2 text-xs hover:border-slate-700 transition">
+                <div class="flex items-center justify-between">
+                  <div class="flex flex-wrap items-center gap-1.5 font-mono">
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded border ${tierBadge}">${test.priority_tier}</span>
+                    ${classBadge}
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">${test.impact_distance || 'direct'}</span>
+                  </div>
+                  <span class="font-mono text-[11px] text-cyan-400 font-bold">Priority: ${priorityScore}</span>
+                </div>
+                <div class="space-y-0.5">
+                  <div class="font-mono font-bold text-slate-100">${escapeHtml(test.test_name)}</div>
+                  <div class="font-mono text-[11px] text-slate-400">${escapeHtml(test.test_file)}</div>
+                </div>
+                <div class="text-[11px] text-slate-300 bg-slate-900/80 p-2 rounded font-mono border border-slate-800/60 space-y-1.5">
+                  <div><span class="text-slate-500">Covers:</span> <span class="text-cyan-400 font-bold">${escapeHtml(test.targeted_symbol)}</span> <span class="text-slate-500 text-[10px]">(${escapeHtml(test.targeted_file || '')})</span></div>
+                  <div class="text-[10px] text-slate-300">${escapeHtml(test.selection_reason || test.explanation || test.reason)}</div>
+                  ${missingHtml}
+                  <div class="text-[10px] text-slate-500 pt-0.5 border-t border-slate-800/40 flex items-center justify-between">
+                    <span>Path: ${escapeHtml(test.evidence?.call_path_description || test.evidence?.call_chain?.join(' &rarr; ') || test.targeted_symbol)}</span>
+                    <span class="text-slate-400">Uncertainty: ${uncPct}%</span>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between pt-1">
+                  <span class="font-mono text-[10px] text-slate-500 truncate max-w-[240px]">${escapeHtml(test.execution_command)}</span>
+                  <button onclick="copyTestCmd('${escapeHtml(test.execution_command)}')" class="px-2.5 py-1 rounded bg-slate-850 hover:bg-slate-800 text-[10px] text-cyan-400 font-mono border border-slate-700 flex items-center space-x-1">
+                    <i data-lucide="copy" class="w-3 h-3"></i>
+                    <span>Copy</span>
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          // 4. Update Fast Command Banner
+          const criticalCmds = (data.prioritized_tests || [])
+            .filter(t => t.priority_tier === 'CRITICAL' || t.priority_tier === 'HIGH')
+            .map(t => t.execution_command);
+          if (criticalCmds.length > 0) {
+            currentFastTestCommand = criticalCmds.slice(0, 5).join(' ');
+            document.getElementById('evo-fast-cmd-text').textContent = currentFastTestCommand;
+            document.getElementById('evo-command-banner').classList.remove('hidden');
+          } else {
+            document.getElementById('evo-command-banner').classList.add('hidden');
+          }
+        } else {
+          testsList.innerHTML = `<div class="p-6 text-center text-slate-500 text-xs bg-slate-950/40 rounded-lg">No existing tests impacted directly or indirectly by these changes.</div>`;
+          document.getElementById('evo-command-banner').classList.add('hidden');
+        }
+
+        // 5. Render Event-Trigger Candidates (Unconfirmed Behavioral Coverage)
+        if (candidatesList) {
+          const candCountEl = document.getElementById('evo-candidates-count');
+          if (candCountEl) candCountEl.textContent = `${candidateCount} candidates`;
+          if (data.event_trigger_candidates && data.event_trigger_candidates.length > 0) {
+            candidatesList.innerHTML = data.event_trigger_candidates.map(cand => {
+              const evText = (cand.structured_evidence && cand.structured_evidence.length > 0)
+                ? cand.structured_evidence.map(e => escapeHtml(e.description)).join('; ')
+                : escapeHtml(cand.selection_reason || cand.explanation || 'Dispatches potential trigger command');
+              const missingText = (cand.missing_evidence && cand.missing_evidence.length > 0)
+                ? cand.missing_evidence.map(m => escapeHtml(m)).join('; ')
+                : 'Behavior-specific assertions or domain coupling not established';
+
+              return `
+                <div class="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-1.5 text-xs hover:border-amber-800/60 transition">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-1.5 font-mono">
+                      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">CANDIDATE</span>
+                      <span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 text-cyan-300 border border-slate-800 font-mono">${escapeHtml(cand.event_name || 'event')}</span>
+                    </div>
+                    <span class="font-mono text-[10px] text-slate-400">Score: ${cand.priority_score.toFixed(2)}</span>
+                  </div>
+                  <div class="space-y-0.5">
+                    <div class="font-mono font-semibold text-slate-200">${escapeHtml(cand.test_name)}</div>
+                    <div class="font-mono text-[10px] text-slate-500">${escapeHtml(cand.test_file)}</div>
+                  </div>
+                  <div class="text-[10px] text-slate-400 bg-slate-900/60 p-1.5 rounded font-mono border border-slate-800/40 space-y-1">
+                    <div><span class="text-amber-400/80 font-semibold">Trigger:</span> ${evText}</div>
+                    <div class="text-slate-500"><span class="text-slate-400 font-semibold">Missing:</span> ${missingText}</div>
+                  </div>
+                  <div class="flex items-center justify-between pt-0.5">
+                    <span class="font-mono text-[9px] text-slate-500 truncate max-w-[200px]">${escapeHtml(cand.execution_command)}</span>
+                    <button onclick="copyTestCmd('${escapeHtml(cand.execution_command)}')" class="px-2 py-0.5 rounded bg-slate-850 hover:bg-slate-800 text-[9px] text-amber-300 font-mono border border-slate-700">
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          } else {
+            candidatesList.innerHTML = `<div class="p-4 text-center text-slate-500 text-xs bg-slate-950/40 rounded-lg">No unconfirmed event trigger candidates.</div>`;
+          }
+        }
+
+        logTerminal('SUCCESS', `Evolution Analysis complete: ${directCount + indirectCount} impacted symbols, ${testsCount} tests prioritized.`);
+        lucide.createIcons();
+      } catch (err) {
+        logTerminal('ERROR', `Evolution Analysis failed: ${err.message}`);
+        symbolsList.innerHTML = `<div class="p-4 text-xs text-rose-400 bg-rose-950/30 border border-rose-800 rounded-xl">Error: ${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-60', 'cursor-not-allowed');
+      }
     }
 
     // Run Full Pipeline (Sequentially executes steps 1-7 with progress updates)

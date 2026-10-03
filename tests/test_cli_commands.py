@@ -2,8 +2,8 @@
 Unit tests for TestPilot AI CLI commands (analyze, generate-boundaries, generate-tests).
 """
 
-from pathlib import Path
 from typer.testing import CliRunner
+
 from testpilot.cli import app
 
 runner = CliRunner()

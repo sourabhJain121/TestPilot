@@ -136,3 +136,4 @@ class GeneratedTestSuite(BaseModel):
 - [x] Deterministic OpenAPI boundary extractor & matrix synthesizer (`testpilot/rag/deterministic_engine.py`).
 - [x] Three-valued Spec-as-Oracle Arbiter with AgentAssay logic (`testpilot/rag/arbiter.py`).
 - [x] Rich terminal CLI (`testpilot`) with end-to-end dry run and `generate-deterministic` commands.
+- [x] Repository Evolution Intelligence & Event-Based Test Impact Analysis (`testpilot/evolution/`, see [`docs/EVOLUTION.md`](./EVOLUTION.md)).

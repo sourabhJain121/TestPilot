@@ -20,6 +20,11 @@ from rich.table import Table
 from testpilot.ast_engine.treesitter_parser import ASTDiffParser
 from testpilot.benchmark.runner import BenchmarkRunner
 from testpilot.core.models import PromptTechnique
+from testpilot.evolution import (
+    EvolutionRequest,
+    InvalidGitReferenceError,
+    RepositoryEvolutionEngine,
+)
 from testpilot.generator.synthesizer import PytestSynthesizer
 from testpilot.llm.client import OllamaLLMClient
 from testpilot.llm.prompt_manager import PromptManager
@@ -310,7 +315,7 @@ def generate_tests(
 ):
     """Generate boundary value unit tests using AST extraction and local Ollama Qwen2.5-Coder."""
     technique_enum = PromptTechnique(technique)
-    
+
     if output:
         dest_path = Path(output)
     else:
@@ -821,6 +826,188 @@ def check_guardrails_cmd(
 
 
 check_guardrails_command = check_guardrails_cmd
+
+
+@app.command("evolution")
+def evolution_cmd(
+    base: str = typer.Option("HEAD~1", "--base", "-b", help="Base Git ref (commit, branch, or tag)"),
+    target: Optional[str] = typer.Option(None, "--target", "-t", help="Target Git ref (default: working tree or HEAD)"),
+    max_depth: int = typer.Option(3, "--max-depth", "-d", help="Max transitive call-graph depth (1-5)"),
+    repo_path: str = typer.Option(".", "--repo-path", "-r", help="Repository root path"),
+):
+    """
+    Repository Evolution Intelligence: Transitive blast-radius analysis & test prioritization.
+    Analyzes code changes between git refs, maps ripple effects across call graphs,
+    and prioritizes existing test suites with execution commands.
+    """
+    console.print(Panel.fit(
+        f"[bold cyan]TestPilot AI — Repository Evolution Intelligence[/bold cyan]\n"
+        f"Diff Range: [bold yellow]{base}[/bold yellow] &rarr; [bold yellow]{target or 'WORKING_TREE'}[/bold yellow] | "
+        f"Transitive Depth: [bold green]{max_depth}[/bold green]"
+    ))
+
+    req = EvolutionRequest(
+        base_ref=base,
+        target_ref=target,
+        max_depth=max_depth,
+        repo_path=repo_path,
+    )
+    engine = RepositoryEvolutionEngine(repo_root=repo_path)
+
+    try:
+        with console.status("[bold green]Analyzing Git diff, tracing AST call graphs & prioritizing tests...[/bold green]"):
+            report = engine.analyze(req)
+    except InvalidGitReferenceError as e:
+        console.print(f"[bold red]Git Reference Error:[/bold red] {e}")
+        raise typer.Exit(code=1) from e
+    except Exception as e:
+        console.print(f"[bold red]Analysis Failed:[/bold red] {e}")
+        raise typer.Exit(code=1) from e
+
+    # 1. Summary Metrics Table
+    summary_table = Table(title="Evolution Analysis Summary", show_lines=True)
+    summary_table.add_column("Metric", style="bold cyan", width=30)
+    summary_table.add_column("Value", style="bold green", width=25)
+    summary_table.add_column("Details", style="dim")
+
+    summary_table.add_row("Base Ref", report.base_ref, "Comparison base")
+    summary_table.add_row("Target Ref", report.target_ref, "Comparison target")
+    summary_table.add_row("Files Changed", str(report.total_files_changed), f"{len(report.changed_symbols)} AST symbols parsed")
+    summary_table.add_row("Transitive Blast Radius", f"{len(report.impact_graph)} symbols impacted", f"{report.direct_impact_count} Direct, {report.indirect_impact_count} Indirect")
+    summary_table.add_row("Total Discovered Tests", f"{report.total_discovered_tests} tests in repository", "Indexed test corpus")
+    summary_table.add_row("Prioritized Regression Tests", f"{report.prioritized_test_count} tests identified", f"{len(report.critical_tests)} Critical, {len(report.high_priority_tests)} High")
+    summary_table.add_row("Event-Trigger Candidates", f"{len(report.event_trigger_candidates)} candidates", "Unconfirmed behavioral coverage")
+    summary_table.add_row("Analysis Latency", f"{report.analysis_latency_ms:.1f} ms", "Real-time AST & graph indexing")
+    console.print(summary_table)
+
+    # 2. Changed Symbols Table
+    if report.changed_symbols:
+        sym_table = Table(title="Detected Changed Symbols", show_lines=True)
+        sym_table.add_column("Symbol", style="bold yellow", width=28)
+        sym_table.add_column("File Path", style="dim", width=40)
+        sym_table.add_column("Lines", width=12)
+        sym_table.add_column("Change Type", width=16)
+
+        for sym in report.changed_symbols:
+            badge_color = "red" if sym.change_type.value == "DELETED" else ("green" if sym.change_type.value == "ADDED" else "cyan")
+            sym_table.add_row(
+                sym.symbol_name,
+                sym.file_path,
+                f"L{sym.start_line}-L{sym.end_line}",
+                f"[{badge_color}]{sym.change_type.value}[/{badge_color}]",
+            )
+        console.print(sym_table)
+    else:
+        console.print("[dim yellow]No symbol-level modifications detected in Python files for this range.[/dim yellow]")
+
+    # 3. Transitive Blast Radius Table
+    if report.impact_graph:
+        impact_table = Table(title=f"Transitive Blast Radius Graph (Depth &le; {max_depth})", show_lines=True)
+        impact_table.add_column("Hop / Depth", width=12, style="bold")
+        impact_table.add_column("Impacted Symbol", style="bold yellow", width=25)
+        impact_table.add_column("File Path", style="dim", width=35)
+        impact_table.add_column("Caller / Source", width=25)
+        impact_table.add_column("Type", width=12)
+        impact_table.add_column("Certainty", width=12)
+
+        for node in report.impact_graph:
+            type_color = "red" if node.impact_type.value == "DIRECT" else "yellow"
+            certainty_pct = (1.0 - node.uncertainty_score) * 100
+            cert_color = "green" if certainty_pct >= 80 else ("yellow" if certainty_pct >= 50 else "red")
+            impact_table.add_row(
+                f"Hop {node.depth}",
+                node.symbol_name,
+                node.file_path,
+                node.evidence.caller_symbol or node.evidence.source_symbol,
+                f"[{type_color}]{node.impact_type.value}[/{type_color}]",
+                f"[{cert_color}]{certainty_pct:.0f}%[/{cert_color}]",
+            )
+        console.print(impact_table)
+
+    # 4. Prioritized Test Suite Table
+    if report.prioritized_tests:
+        test_table = Table(title="Prioritized Existing Test Suite (Confirmed Regression Coverage)", show_lines=True)
+        test_table.add_column("Tier", width=10, style="bold")
+        test_table.add_column("Classification", width=24)
+        test_table.add_column("Test Function", style="bold yellow", width=28)
+        test_table.add_column("Test File", style="dim", width=32)
+        test_table.add_column("Targeted Symbol", width=20)
+        test_table.add_column("Score", width=8)
+        test_table.add_column("Selection Reason / Evidence", style="dim", width=35)
+
+        tier_colors = {
+            "CRITICAL": "bold red",
+            "HIGH": "bold yellow",
+            "MEDIUM": "cyan",
+            "LOW": "dim",
+        }
+
+        classification_colors = {
+            "BEHAVIORAL_COVERAGE": "green",
+            "EXPLICIT_EVENT_DISPATCH": "magenta",
+            "EVENT_TRIGGER_CANDIDATE": "yellow",
+            "NO_RELEVANT_EVENT_EVIDENCE": "dim",
+        }
+
+        for test in report.prioritized_tests:
+            color = tier_colors.get(test.priority_tier.value, "white")
+            classification_val = test.match_classification.value if test.match_classification else "CALL_GRAPH"
+            class_color = classification_colors.get(classification_val, "cyan")
+            reason = test.selection_reason or test.explanation or ""
+
+            test_table.add_row(
+                f"[{color}]{test.priority_tier.value}[/{color}]",
+                f"[{class_color}]{classification_val}[/{class_color}]",
+                test.test_function,
+                test.test_file,
+                test.target_symbol,
+                f"{test.priority_score:.2f}",
+                reason,
+            )
+        console.print(test_table)
+
+        # Print quick run command
+        critical_cmds = [t.execution_command for t in report.critical_tests]
+        if critical_cmds:
+            console.print(Panel(
+                f"[bold green]Recommended Fast-Feedback Command:[/bold green]\n"
+                f"[bold white]{' '.join(critical_cmds[:5])}[/bold white]",
+                title="Immediate Regression Verification",
+            ))
+    else:
+        console.print("[dim green]No existing tests impacted directly or indirectly by these changes.[/dim green]")
+
+    # 5. Possible Event-Trigger Candidates Table
+    if report.event_trigger_candidates:
+        candidate_table = Table(
+            title=f"Possible Event-Trigger Candidates ({len(report.event_trigger_candidates)} tests — Unconfirmed Behavioral Coverage)",
+            show_lines=True,
+        )
+        candidate_table.add_column("Event", style="bold cyan", width=14)
+        candidate_table.add_column("Test Function", style="bold yellow", width=28)
+        candidate_table.add_column("Test File", style="dim", width=32)
+        candidate_table.add_column("Trigger Evidence", width=30)
+        candidate_table.add_column("Missing Evidence", style="dim yellow", width=35)
+
+        for cand in report.event_trigger_candidates:
+            ev_desc = ""
+            if cand.structured_evidence:
+                ev_desc = "; ".join(e.description for e in cand.structured_evidence[:2])
+            elif cand.selection_reason:
+                ev_desc = cand.selection_reason
+            missing = "; ".join(cand.missing_evidence) if cand.missing_evidence else "Awaiting behavioral verification"
+
+            candidate_table.add_row(
+                cand.event_name or "event",
+                cand.test_function,
+                cand.test_file,
+                ev_desc,
+                missing,
+            )
+        console.print(candidate_table)
+
+
+evolution_command = evolution_cmd
 
 
 if __name__ == "__main__":
