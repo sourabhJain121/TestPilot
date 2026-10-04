@@ -38,3 +38,9 @@ remediation.patch
 # OS files
 .DS_Store
 Thumbs.db
+
+# Generated reports
+reports/*.json
+reports/*.md
+!reports/.gitkeep
+

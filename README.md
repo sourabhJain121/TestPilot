@@ -1,236 +1,263 @@
-# TestPilot AI: Autonomous Spec-as-Oracle Testing and Regression Remediation Agent
+# 🚀 TestPilot AI: Autonomous Spec-as-Oracle & Repository Evolution Intelligence Agent
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com)
+[![Tree-Sitter](https://img.shields.io/badge/AST-Tree--sitter_0.21%2B-5c2d91.svg)](https://tree-sitter.github.io)
 [![Pydantic v2](https://img.shields.io/badge/Pydantic-v2.5%2B-e92063.svg)](https://docs.pydantic.dev)
-[![Local LLM](https://img.shields.io/badge/Local_LLM-Ollama_Qwen2.5--Coder-orange.svg)](https://ollama.ai)
+[![Local LLM](https://img.shields.io/badge/Local_LLM-Ollama_CodeLlama_&_Qwen-orange.svg)](https://ollama.ai)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Course**: CSE 4011 — Intelligent Developer Tools and AI DevOps Workflows  
-> **Role**: Senior Staff Engineer (DevOps & ML Systems) + Capstone Review Panelist  
-> **Phase 1 Evaluation (30% Weight)**: Week of September 21, 2026  
+> **TestPilot AI** is an enterprise-grade autonomous testing, regression prioritization, and closed-loop code remediation agent. It reframes software testing by using formal specifications (OpenAPI 3.1 & PRDs) as the ground-truth oracle, combined with AST-level repository evolution intelligence to automatically analyze Git diffs, map transitive blast radiuses, prioritize affected tests, and generate self-healing patches.
 
 ---
 
-## 1. The Core Paradigm: Spec-as-Oracle & True Novelty
+## 🌟 Key Features
 
-While schema-conformance and property-based API testing tools like **Schemathesis** and **Specmatic** have long utilized OpenAPI contracts to generate endpoint fuzzing requests, they operate under rigid input-fuzzing assumptions and treat any discrepancy as an undifferentiated failure. Conversely, modern LLM-based test generators frequently treat fallible source code as the oracle, writing assertions that formalize existing software bugs as permanent specification debt.
+1. **Spec-as-Oracle Triaging (Three-Valued Logic)**:
+   - Rather than binary pass/fail, TestPilot classifies test failures into three distinct categories using semantic retrieval over OpenAPI 3.1 & PRDs:
+     - `TRUE_CODE_DEFECT`: The implementation violates an explicit spec contract $\rightarrow$ triggers autonomous remediation.
+     - `INVALID_TEST_ASSERTION`: The test hallucinated behavior or asserted ungrounded expectations contradictory to the contract $\rightarrow$ pruned to prevent test debt.
+     - `SPEC_AMBIGUITY_OR_DEFECT`: The contract is underspecified or contradictory $\rightarrow$ flagged for product review.
 
-**TestPilot AI** reframes contract-driven testing by acknowledging prior art in schema conformance while introducing three foundational architectural novelties:
+2. **Repository Evolution Intelligence & Remote Git Testing**:
+   - **Direct Git URL Support**: Input any remote Git repository link (e.g., `https://github.com/pallets/flask.git`, `https://github.com/django/django.git`) or local directory. TestPilot shallow-clones (`--depth 50`) into `~/.testpilot_repos/` and analyzes it immediately.
+   - **AST Symbol Tracking**: Detects added, deleted, and modified Python functions, classes, and methods across commits.
+   - **Transitive Blast Radius Call Graph**: Traces direct and indirect callers across the codebase using Sourcegraph GraphQL with local AST fallback.
+   - **Explainable Test Prioritization**: Computes uncertainty scores and ranks regression tests into `CRITICAL`, `HIGH`, `MEDIUM`, and `LOW` tiers with token-boundary matching and structured evidence trails.
 
-1. **Automated Triaging Arbiter (Three-Valued Logic)**: Rather than reporting binary pass/fail results, TestPilot dynamically retrieves formal specification clauses via semantic RAG and employs three-valued logic (inspired by *AgentAssay*) to distinguish between:
-   - `TRUE_CODE_DEFECT`: The code implementation deviates from an unambiguous OpenAPI/PRD specification contract $\rightarrow$ triggers automated remediation.
-   - `INVALID_TEST_ASSERTION`: The test hallucinated behavior or asserted ungrounded expectations contradictory to the contract $\rightarrow$ pruned to prevent test debt.
-   - `SPEC_AMBIGUITY_OR_DEFECT`: The specification is silent, contradictory, or underspecified on the boundary condition $\rightarrow$ flagged for product/API spec review.
-2. **AST-Grounded Boundary Synthesis (Hybrid Deterministic + LLM Engine)**: Combines deterministic OpenAPI schema boundary extraction (numeric extrema, string lengths, enum bounds) and Tree-sitter AST syntax parsing (guard conditions, type annotations) with Chain-of-Thought LLM reasoning over nuanced natural-language PRD requirements.
-3. **Closed-Loop Remediation (Sweep.dev Pattern)**: Rather than merely reporting failures, TestPilot autonomously synthesizes code repairs for confirmed `TRUE_CODE_DEFECT` verdicts and executes isolated regression sandboxing (pytest) to validate the patch before generating git PRs.
+3. **Multi-Model Local LLM Support (CodeLlama & Qwen)**:
+   - Native integration with **Ollama** running locally on your hardware.
+   - Supports **CodeLlama** (`codellama:7b`, `codellama:13b`, `codellama:34b`, `codellama:code`) and **Qwen2.5-Coder** (`qwen2.5-coder:7b`).
+   - Switch active models dynamically via the UI top bar or CLI environment variables (`OLLAMA_MODEL="codellama:7b"`).
+
+4. **One-Click Downloadable Reports**:
+   - Export detailed Markdown (`.md`) and JSON (`.json`) audit reports for both Repository Evolution analysis and 7-stage Spec-as-Oracle pipeline executions.
+   - Instant browser download or server-side persistence in `reports/`.
+
+5. **Safety Guardrails & AST Quarantine**:
+   - Prevents prompt injection, malicious OS system calls (`os.system`, `subprocess.Popen`), unauthorized file deletion (`rm -rf`), and ungrounded hallucinations before any test or patch is executed.
+
+6. **Closed-Loop Sandbox Remediation (Sweep.dev Pattern)**:
+   - Synthesizes automated unified git diff patches for confirmed code defects.
+   - Automatically validates fixes in an isolated pytest sandbox before creating git branches (`testpilot/fix-*`).
+
+---
+
+## 🏗️ System Architecture
 
 ```
                     ┌──────────────────────────────────────────────┐
-                    │   OpenAPI 3.1 & PRD Specification Oracle     │
-                    │        (ChromaDB Semantic Retrieval)         │
+                    │      Target Git Repository / PR Diff         │
+                    │   (Local Path or Remote Clone via URL)       │
                     └──────────────────────┬───────────────────────┘
                                            │
-                        Three-Valued Arbitration Logic
+                    ┌──────────────────────▼───────────────────────┐
+                    │   AST Engine & Symbol Change Extraction      │
+                    │      (Tree-sitter Python Syntax Parser)      │
+                    └──────────────────────┬───────────────────────┘
                                            │
-         ┌─────────────────────────────────┼─────────────────────────────────┐
-         ▼                                 ▼                                 ▼
+         ┌─────────────────────────────────┴─────────────────────────────────┐
+         ▼                                                                   ▼
+┌───────────────────────────────┐                   ┌────────────────────────────────┐
+│   Transitive Blast Radius     │                   │  Deterministic Boundary Engine │
+│ Local AST / Sourcegraph Graph │                   │ Extrema, Enums, Nulls, Off-by-1│
+└──────────────┬────────────────┘                   └────────────────┬───────────────┘
+               │                                                     │
+               ▼                                                     ▼
+┌───────────────────────────────┐                   ┌────────────────────────────────┐
+│ Test Prioritization Engine   │                   │ Chain-of-Thought LLM Synthesis │
+│ (Uncertainty Scoring & Tiers) │                   │  (CodeLlama:7b / Qwen2.5-Coder)│
+└──────────────┬────────────────┘                   └────────────────┬───────────────┘
+               │                                                     │
+               └───────────────────────┬─────────────────────────────┘
+                                       │
+                    ┌──────────────────▼───────────────────┐
+                    │  Spec-as-Oracle Triaging Arbiter     │
+                    │ (Three-Valued Logic Semantic RAG)    │
+                    └──────────────────┬───────────────────┘
+                                       │
+     ┌─────────────────────────────────┼─────────────────────────────────┐
+     ▼                                 ▼                                 ▼
 ┌─────────────────────────┐   ┌───────────────────────────┐   ┌───────────────────────────┐
 │ INVALID_TEST_ASSERTION  │   │     TRUE_CODE_DEFECT      │   │ SPEC_AMBIGUITY_OR_DEFECT  │
-│  Prune hallucinated or  │   │ Code violated unambiguous │   │ Specification is silent   │
-│   drifted test debt     │   │ contract -> Auto-Remedy   │   │ or ambiguous on boundary  │
+│ Prune hallucinated test │   │ Autonomous Sandbox Repair │   │ Flag spec inconsistency   │
+│ from test suite         │   │ (Sweep.dev Patch PR)      │   │ for engineer review       │
 └─────────────────────────┘   └───────────────────────────┘   └───────────────────────────┘
 ```
 
 ---
 
-## 2. Strategic Differentiation: TestForge vs. Industry Tools vs. TestPilot AI
+## 📋 Prerequisites & Installation
 
-| Dimension | Schemathesis / Specmatic | TestForge (Prior Project: CSE 3101) | TestPilot AI (Target Project: CSE 4011) |
-| :--- | :--- | :--- | :--- |
-| **Core Problem** | Schema validation & fuzzing against HTTP endpoints | Hollow assertions in isolated unit tests | Regression triaging, spec drift, & test debt in CI/CD PRs |
-| **Ground Truth Oracle** | Strict OpenAPI Schema alone | **Code is Oracle**: Mutates code to measure test kill rate | **Spec-as-Oracle**: Formal OpenAPI + PRD semantic ground truth |
-| **Boundary Analysis** | Black-box property-based fuzzing | Local heuristic mutation analysis | **AST-Grounded Syntax Extrema + Deterministic Schema Matrices + CoT LLM** |
-| **Triaging Logic** | Binary (HTTP status / schema validation fail) | Mutation survival binary score | **Three-Valued Arbiter** (`DEFECT` vs `INVALID_TEST` vs `SPEC_AMBIGUITY`) |
-| **Remediation** | None (manual engineer debugging) | Retries prompt until mutants die | **Closed-Loop Sandbox Remediation** (Automated Git patch PR) |
+### 1. System Requirements
+- **macOS** (Apple Silicon M-series recommended) or **Linux** (x86_64 / aarch64)
+- **Python**: `>= 3.10` (Tested on Python 3.11, 3.12, 3.14)
+- **Git**: `>= 2.30`
+- **Ollama**: Local LLM runner ([Download Ollama](https://ollama.ai))
 
----
+### 2. Install Ollama & Models
+Start the Ollama background service and pull the recommended coding models:
 
-## 3. End-to-End System Architecture
-
-```mermaid
-graph TD
-    subgraph Ingestion ["1. Multi-Modal Ingestion & Vector Indexing"]
-        Diff["Unified Git Diff / PR"]
-        Spec["OpenAPI 3.1 Contract (openapi.json)"]
-        PRD["PRD Requirements (Markdown)"]
-        Chroma["ChromaDB Vector Store (SentenceTransformers)"]
-        Spec --> Chroma
-        PRD --> Chroma
-    end
-
-    subgraph Intelligence ["2. Code & Graph Intelligence"]
-        AST["AST & Unified Diff Parser"]
-        SG["Sourcegraph OSS GraphQL Client"]
-        Fallback["Autonomous Local AST Call Graph"]
-        DetEngine["Deterministic Boundary Extractor (Schema Bounds)"]
-    end
-
-    subgraph PromptEngine ["3. Boundary Synthesis Engine"]
-        PromptMgr["Prompt Manager (Zero/Few/CoT)"]
-        Ollama["Local Ollama (Qwen2.5-Coder:7b)"]
-        Validator["Pydantic v2 Schema Validator"]
-        Synth["Pytest Code Synthesizer"]
-    end
-
-    subgraph Oracle ["4. Three-Valued Arbiter & Closed-Loop Remediation"]
-        Runner["Isolated Test Execution (pytest)"]
-        Arbiter{"Three-Valued Spec Arbiter"}
-        Bug["TRUE_CODE_DEFECT -> Closed-Loop Patch Sandbox"]
-        Debt["INVALID_TEST_ASSERTION -> Prune Test Debt"]
-        Ambiguity["SPEC_AMBIGUITY_OR_DEFECT -> Flag Spec Debt"]
-        PatchBot["Sweep.dev Autonomous Remediation Bot"]
-    end
-
-    Diff --> AST
-    Diff --> SG
-    SG -.->|Docker Offline Fallback| Fallback
-    Spec --> DetEngine
-    DetEngine --> Synth
-
-    AST --> PromptMgr
-    SG --> PromptMgr
-    Fallback --> PromptMgr
-    Chroma -.->|Retrieved Clauses| PromptMgr
-
-    PromptMgr --> Ollama
-    Ollama --> Validator
-    Validator --> Synth
-    Synth --> Runner
-
-    Runner --> Arbiter
-    Chroma -.->|Contract Ground Truth| Arbiter
-    Arbiter --> Bug
-    Arbiter --> Debt
-    Arbiter --> Ambiguity
-    Bug --> PatchBot
-```
-
----
-
-## 4. Repository Layout
-
-```
-TestPilot/
-├── docs/
-│   ├── SYNOPSIS.md              # Phase 1 Capstone Charter & Academic Synopsis
-│   ├── ARCHITECTURE.md          # Full Architectural Blueprint & Data Contracts
-│   └── PHASE1_EVALUATION.md     # Step-by-Step Viva Demonstration Script
-├── testbed/                     # Realistic Target Microservice
-│   ├── openapi.json             # Exported OpenAPI 3.1 specification
-│   └── app/
-│       ├── models.py            # Pydantic v2 schemas (CartItem, Order, etc.)
-│       ├── services/
-│       │   └── order_service.py # Domain logic with 3 intentional boundary bugs
-│       └── main.py              # FastAPI REST endpoints + CLI export flag
-├── testpilot/                   # TestPilot AI Core Package
-│   ├── core/
-│   │   └── models.py            # AST, Prompt, and Verdict domain models
-│   ├── ast_engine/
-│   │   └── treesitter_parser.py # AST parser for unified git diffs & boundary values
-│   ├── sourcegraph/
-│   │   └── client.py            # GraphQL client with local AST fallback
-│   ├── llm/
-│   │   ├── client.py            # Ollama client with JSON schema enforcement
-│   │   └── prompt_manager.py    # Zero-shot, Few-shot, CoT boundary templates
-│   ├── generator/
-│   │   └── synthesizer.py       # Syntax-validated Pytest test suite generator
-│   └── cli.py                   # Rich terminal CLI
-├── docker/
-│   └── docker-compose.sourcegraph.yml # Sourcegraph OSS container configuration
-├── tests/                       # Test suite
-│   ├── test_ast_parser.py       # AST parser and diff chunk tests
-│   ├── test_sourcegraph_client.py # GraphQL & local call graph fallback tests
-│   ├── test_prompts.py          # Prompt engineering & JSON parsing tests
-│   └── test_synthesizer.py      # Pytest synthesis and syntax validation tests
-├── pyproject.toml               # Project metadata and CLI script bindings
-└── ruff.toml                    # Code style and linting rules
-```
-
----
-
-## 5. Quickstart & Installation
-
-### Prerequisites
-- Python 3.10+ (macOS / Linux)
-- [Ollama](https://ollama.ai) installed with `qwen2.5-coder:7b`:
-  ```bash
-  ollama pull qwen2.5-coder:7b
-  ```
-
-### Setup Environment
 ```bash
+# Pull CodeLlama 7B (Default)
+ollama pull codellama:7b
+
+# (Optional) Pull Qwen2.5-Coder
+ollama pull qwen2.5-coder:7b
+
+# Verify models are installed
+ollama list
+```
+
+### 3. Clone and Setup TestPilot
+```bash
+# Clone the TestPilot repository
 git clone https://github.com/sourabhJain121/TestPilot.git
 cd TestPilot
 
-# Create and activate virtual environment
+# Create and activate a Python virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies and CLI in editable mode
-pip install -e .
+# Install dependencies in editable mode
+pip install --upgrade pip
+pip install -e ".[dev]"
 ```
 
 ---
 
-## 6. CLI Commands & Evaluation Walkthrough
+## 🚀 Running TestPilot
 
-### 1. System Health Check
-Verify Python runtime, local Ollama connectivity, model readiness, and code graph resolution:
+### Option A: Launch the Interactive Web Dashboard (Recommended)
+
+Run TestPilot with the **CodeLlama** model:
+
 ```bash
-testpilot status
+# Start Web UI with CodeLlama 7B on port 8501
+OLLAMA_MODEL="codellama:7b" testpilot ui --port 8501 --host 127.0.0.1
 ```
 
-### 2. AST Parsing & Boundary Discovery
-Inspect decision branch nodes and automatically discovered boundary candidates:
+Or run with **Qwen2.5-Coder**:
 ```bash
-testpilot parse-diff --file testbed/app/services/order_service.py
+OLLAMA_MODEL="qwen2.5-coder:7b" testpilot ui --port 8501 --host 127.0.0.1
 ```
 
-### 3. Sourcegraph Symbol Navigation & Blast Radius
-Query downstream callers using Sourcegraph GraphQL or local AST fallback:
+Once launched, open your web browser at:
+👉 **[http://127.0.0.1:8501](http://127.0.0.1:8501)**
+
+---
+
+### Option B: CLI Commands
+
+#### 1. Test Any Git Repository (Local or Remote)
 ```bash
-testpilot check-sourcegraph calculate_order_totals
+# Analyze changes between two commits in the current repo:
+testpilot evolution analyze --base HEAD~1 --target HEAD --repo-path .
+
+# Analyze a specific remote or cloned repository:
+testpilot evolution analyze --base main~5 --target main --repo-path ~/.testpilot_repos/flask
 ```
 
-### 4. Synthesize Boundary Tests with Chain-of-Thought
-Generate executable `pytest` tests using local `qwen2.5-coder:7b`:
+#### 2. Deterministic Schema Boundary Test Generation
 ```bash
-testpilot generate-tests --file testbed/app/services/order_service.py --technique cot --output tests/generated/test_order_service.py
+# Generate deterministic boundary tests for OrderRequest schema
+testpilot testgen generate --schema OrderRequest --boundary all --out tests/generated/test_order_service.py
 ```
 
-### 5. Execute Spec-as-Oracle Arbitration
-Run the generated tests against the testbed microservice and arbitrate the 3 seeded boundary bugs:
+#### 3. Spec-as-Oracle Arbitration
 ```bash
-testpilot verify
+# Arbitrate failures in the testbed microservice against PRD / OpenAPI specs
+testpilot testgen arbitrate --test-path tests/generated/test_order_service.py
+```
+
+#### 4. Autonomous Code Remediation
+```bash
+# Synthesize an isolated patch for a true code defect
+testpilot remediate --file testbed/app/services/order_service.py --out remediation.patch
 ```
 
 ---
 
-## 7. Phase 1 Evaluation Day-by-Day Checklist
+## 🖥️ Web Dashboard Tour: Step-by-Step Verification
 
-- [x] **Day 1**: Monorepo scaffolding with `ruff`, `mypy`, and pytest. Submit the **One-Page Project Charter** (`docs/SYNOPSIS.md`).
-- [x] **Day 2**: Deploy modular FastAPI microservice (`testbed/`) with 3 interdependent routes and intentional boundary bugs. Export its `openapi.json`.
-- [x] **Day 3**: Launch Sourcegraph via Docker (`sourcegraph/server:5.3.0`). Build the Python client (`sourcegraph/client.py`) to query caller references via GraphQL.
-- [x] **Day 4**: Implement resilient fallback: `treesitter_parser.py` extracting AST definitions directly from unified git diffs without external dependencies.
-- [x] **Day 5**: Build the Prompt Engine (`prompt_manager.py`) using local Ollama (`qwen2.5-coder:7b`). Implement zero-shot vs. chain-of-thought prompt templates for boundary value discovery.
-- [x] **Day 6**: Wire AST diff context into the prompt engine. Validate generated `pytest` code using Pydantic schema constraints.
-- [x] **Day 7**: Phase 1 dry run: Demonstrate live Sourcegraph symbol cross-referencing and prompt-driven test generation from the terminal.
+The TestPilot web interface (`http://127.0.0.1:8501`) provides 9 integrated modules:
+
+| Tab Name | Description | Key User Action |
+|:---|:---|:---|
+| **1. Overview** | System health, Ollama status, active model, and telemetry. | View live connected models, active vector store, and guardrails. |
+| **2. Target Git Repo & Evolution** | Remote URL clone & Git diff test discovery engine. | Input `https://github.com/pallets/flask.git`, click **Load / Clone Repo**, select commits, and click **Analyze Evolution**. |
+| **3. AST Diff Inspector** | Tree-sitter semantic function change parser. | Compare old vs new Python code to view added/modified methods and parameters. |
+| **4. Transitive Blast Radius** | Sourcegraph GraphQL / Local AST caller graph traversal. | Enter symbol (e.g. `calculate_order_totals`) and click **Traverse Call Graph**. |
+| **5. Deterministic Boundaries** | High-precision boundary matrix generator. | Select schema `OrderRequest` and click **Generate Boundary Suite**. |
+| **6. Spec Triaging Arbiter** | Three-valued logic contract arbitration. | Click **Arbitrate Failures** to see `TRUE_CODE_DEFECT`, `INVALID_TEST_ASSERTION`, `SPEC_AMBIGUITY_OR_DEFECT`. |
+| **7. Safety Guardrails** | AST code quarantine & injection defense. | Test malicious scripts (`os.system('rm -rf /')`) to verify quarantine defense. |
+| **8. Autonomous Remediation** | Sweep.dev pattern automated patch generation. | Click **Generate & Verify Patch** to synthesize and sandbox a verified fix. |
+| **9. Empirical Benchmarks** | Comparative metrics across models and tools. | Compare CodeLlama vs Qwen vs Schemathesis across precision and recall. |
 
 ---
 
-## 8. Academic Deliverables & Documentation
+## 📥 Downloadable Reports
 
-- [Project Charter & Synopsis](file:///Users/sourabh/TestPilot/docs/SYNOPSIS.md)
-- [Architecture Specification](file:///Users/sourabh/TestPilot/docs/ARCHITECTURE.md)
-- [Phase 1 Viva & Demo Script](file:///Users/sourabh/TestPilot/docs/PHASE1_EVALUATION.md)
+TestPilot generates clean, publication-ready reports in both Markdown and JSON:
+
+1. **Top Header Button (`Download Report`)**:
+   - Instantly downloads the complete Spec-as-Oracle Pipeline Report including arbitration breakdown and sandboxed remediation patches.
+2. **Evolution Tab Button (`Download Report`)**:
+   - Instantly exports the Repository Evolution Intelligence Report with changed AST symbols, transitive call paths, uncertainty scores, and executable regression test commands.
+3. **Persisted Disk Storage**:
+   - All exported reports are automatically archived under the `reports/` directory with UTC timestamps.
+
+---
+
+## 🧪 Running Automated Tests & Linting
+
+TestPilot includes a comprehensive test suite (117+ tests) with zero-tolerance strict linting:
+
+```bash
+# Run the focused evolution intelligence test suite
+.venv/bin/pytest tests/test_evolution.py -v
+
+# Run the complete test suite
+.venv/bin/pytest -v
+
+# Run Ruff code analysis
+.venv/bin/ruff check testpilot/ tests/
+```
+
+---
+
+## 📂 Project Directory Structure
+
+```
+TestPilot/
+├── testpilot/
+│   ├── ast_engine/             # Tree-sitter AST syntax and diff parsers
+│   ├── evolution/              # Repository Evolution Intelligence & Git analysis
+│   │   ├── engine.py           # Core diff, symbol change, and test prioritization
+│   │   ├── models.py           # Pydantic schemas for impact nodes and reports
+│   │   └── evaluator.py        # Empirical precision/recall benchmark engine
+│   ├── guardrails/             # AST code quarantine & anti-injection guardrails
+│   ├── llm/                    # Ollama client supporting CodeLlama & Qwen
+│   ├── rag/                    # Vector store, ChromaDB, and 3-Valued Arbiter
+│   ├── remediation/            # Sweep.dev pattern autonomous patch generator
+│   ├── sourcegraph/            # Sourcegraph GraphQL client with local fallback
+│   └── web/                    # FastAPI backend and responsive Glassmorphism UI
+│       ├── api.py              # REST API endpoints (load repo, model switch, export)
+│       └── static/index.html   # Single-page modern developer dashboard
+├── testbed/                    # Isolated microservice with seeded business bugs
+├── tests/                      # Full pytest verification suite
+│   ├── test_evolution.py       # 28 comprehensive evolution regression tests
+│   └── test_deterministic_engine.py
+├── reports/                    # Persisted audit and benchmark reports
+├── docs/                       # Architecture and evolution specifications
+├── pyproject.toml              # Build configuration and project dependencies
+└── README.md                   # Complete documentation
+```
+
+---
+
+## 👥 Authors & Academic Context
+
+- **Author**: Sourabh Jain
+- **Repository**: [sourabhJain121/TestPilot](https://github.com/sourabhJain121/TestPilot)
+- **License**: MIT

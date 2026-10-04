@@ -4,6 +4,8 @@ Wraps core modules: AST analysis, Sourcegraph call hierarchy, deterministic boun
 Spec-as-Oracle three-valued arbitration, and empirical benchmarking.
 """
 
+import json
+import os
 import re
 import subprocess
 import sys
@@ -389,7 +391,98 @@ def get_guardrails_audit() -> dict[str, Any]:
     }
 
 
-# 9. Repository Evolution Intelligence
+# 9. Repository Evolution Intelligence & Remote Git Testing
+class RepoLoadRequest(BaseModel):
+    repo_url_or_path: str
+    branch: Optional[str] = None
+
+
+@app.post("/api/repo/load")
+def load_or_clone_repo(request: RepoLoadRequest) -> dict[str, Any]:
+    """
+    Validates a local Git repository path or clones a remote Git repository URL
+    (e.g., https://github.com/pallets/flask.git) into a cache directory for testing.
+    """
+    input_str = request.repo_url_or_path.strip()
+    if not input_str:
+        raise HTTPException(status_code=400, detail="Repository URL or path is required.")
+
+    is_remote = input_str.startswith("http://") or input_str.startswith("https://") or input_str.startswith("git@")
+
+    if not is_remote:
+        # Check local path
+        p = Path(input_str).expanduser().resolve()
+        if not p.exists() or not p.is_dir():
+            raise HTTPException(status_code=400, detail=f"Local directory does not exist: {p}")
+        chk = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=str(p), capture_output=True, text=True)
+        if chk.returncode != 0:
+            raise HTTPException(status_code=400, detail=f"Directory is not a valid Git repository: {p}")
+        target_path = p
+        repo_name = p.name
+    else:
+        # Remote Git URL: clone into cache directory
+        import re
+        m = re.search(r"/([^/]+?)(?:\.git)?$", input_str)
+        repo_name = m.group(1) if m else "external_repo"
+        cache_dir = Path.home() / ".testpilot_repos"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        target_path = cache_dir / repo_name
+
+        if target_path.exists() and (target_path / ".git").exists():
+            # Already cloned, fetch updates
+            subprocess.run(["git", "fetch", "--depth", "50"], cwd=str(target_path), capture_output=True, text=True)
+        else:
+            clone_cmd = ["git", "clone", "--depth", "50", input_str, str(target_path)]
+            if request.branch:
+                clone_cmd.extend(["--branch", request.branch])
+            res = subprocess.run(clone_cmd, capture_output=True, text=True)
+            if res.returncode != 0:
+                raise HTTPException(status_code=400, detail=f"Failed to clone repository: {res.stderr.strip() or res.stdout.strip()}")
+
+    # Collect branch and commit data
+    branches: list[str] = []
+    commits: list[dict[str, str]] = []
+    current_branch = "HEAD"
+
+    try:
+        cur_proc = subprocess.run(["git", "branch", "--show-current"], cwd=str(target_path), capture_output=True, text=True)
+        if cur_proc.returncode == 0 and cur_proc.stdout.strip():
+            current_branch = cur_proc.stdout.strip()
+
+        branch_proc = subprocess.run(["git", "branch", "-a"], cwd=str(target_path), capture_output=True, text=True)
+        if branch_proc.returncode == 0:
+            for line in branch_proc.stdout.splitlines():
+                b = line.replace("*", "").strip()
+                if b and not b.startswith("remotes/origin/HEAD"):
+                    branches.append(b)
+
+        log_proc = subprocess.run(["git", "log", "-n", "10", "--oneline"], cwd=str(target_path), capture_output=True, text=True)
+        if log_proc.returncode == 0:
+            for line in log_proc.stdout.splitlines():
+                parts = line.split(" ", 1)
+                if len(parts) == 2:
+                    commits.append({"hash": parts[0], "message": parts[1]})
+                elif len(parts) == 1 and parts[0]:
+                    commits.append({"hash": parts[0], "message": ""})
+    except Exception:
+        pass
+
+    return {
+        "status": "READY",
+        "repo_name": repo_name,
+        "repo_path": str(target_path),
+        "is_remote": is_remote,
+        "current_branch": current_branch,
+        "branches": sorted(set(branches)),
+        "recent_commits": commits,
+        "presets": [
+            {"label": "Working Tree vs HEAD", "base_ref": "HEAD", "target_ref": None},
+            {"label": "Last Commit (HEAD~1..HEAD)", "base_ref": "HEAD~1", "target_ref": "HEAD"},
+            {"label": "Branch vs main", "base_ref": "main", "target_ref": None},
+        ],
+    }
+
+
 @app.post("/api/evolution/analyze")
 def analyze_evolution(request: EvolutionRequest) -> dict[str, Any]:
     """
@@ -408,8 +501,9 @@ def analyze_evolution(request: EvolutionRequest) -> dict[str, Any]:
 
 
 @app.get("/api/evolution/refs")
-def get_git_refs() -> dict[str, Any]:
+def get_git_refs(repo_path: Optional[str] = None) -> dict[str, Any]:
     """Retrieve available Git branches, tags, and recent commit history for analysis selection."""
+    target_repo = Path(repo_path).expanduser().resolve() if repo_path else Path(".").resolve()
     branches: list[str] = []
     commits: list[dict[str, str]] = []
     current_branch = "main"
@@ -417,6 +511,7 @@ def get_git_refs() -> dict[str, Any]:
     try:
         cur_proc = subprocess.run(
             ["git", "branch", "--show-current"],
+            cwd=str(target_repo),
             capture_output=True,
             text=True,
             check=False,
@@ -426,6 +521,7 @@ def get_git_refs() -> dict[str, Any]:
 
         branch_proc = subprocess.run(
             ["git", "branch", "-a"],
+            cwd=str(target_repo),
             capture_output=True,
             text=True,
             check=False,
@@ -438,6 +534,7 @@ def get_git_refs() -> dict[str, Any]:
 
         log_proc = subprocess.run(
             ["git", "log", "-n", "8", "--oneline"],
+            cwd=str(target_repo),
             capture_output=True,
             text=True,
             check=False,
@@ -456,6 +553,7 @@ def get_git_refs() -> dict[str, Any]:
         "current_branch": current_branch,
         "branches": sorted(set(branches)),
         "recent_commits": commits,
+        "repo_path": str(target_repo),
         "presets": [
             {"label": "Working Tree vs HEAD", "base_ref": "HEAD", "target_ref": None},
             {"label": "Last Commit (HEAD~1..HEAD)", "base_ref": "HEAD~1", "target_ref": "HEAD"},
@@ -464,7 +562,59 @@ def get_git_refs() -> dict[str, Any]:
     }
 
 
-# 10. Static Files & Root Route
+# 10. Model Configuration & Report Export
+class ModelConfigRequest(BaseModel):
+    model: str
+
+
+@app.post("/api/settings/model")
+def set_active_model(request: ModelConfigRequest) -> dict[str, Any]:
+    """Switch active LLM model (e.g. codellama:7b, qwen2.5-coder:7b)."""
+    os.environ["OLLAMA_MODEL"] = request.model
+    client = OllamaLLMClient(model=request.model)
+    health = client.check_health()
+    return {
+        "status": "UPDATED",
+        "model": request.model,
+        "available": health.get("model_available", False),
+        "installed_models": health.get("installed_models", []),
+    }
+
+
+class ReportExportRequest(BaseModel):
+    repo_name: str
+    report_type: str = "evolution"
+    data: dict[str, Any]
+    markdown_content: Optional[str] = None
+
+
+@app.post("/api/report/export")
+def export_report(request: ReportExportRequest) -> dict[str, Any]:
+    """Generate and save downloadable report in reports/ directory."""
+    import time
+    reports_dir = Path("reports")
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    ts = int(time.time())
+    safe_repo = request.repo_name.replace("/", "_").replace(":", "_").replace(" ", "_")
+    base_filename = f"testpilot_{safe_repo}_{request.report_type}_{ts}"
+
+    json_path = reports_dir / f"{base_filename}.json"
+    json_path.write_text(json.dumps(request.data, indent=2), encoding="utf-8")
+
+    md_content = request.markdown_content or f"# TestPilot Report for {request.repo_name}\n\nType: {request.report_type}\nTimestamp: {ts}\n"
+    md_path = reports_dir / f"{base_filename}.md"
+    md_path.write_text(md_content, encoding="utf-8")
+
+    return {
+        "status": "SAVED",
+        "success": True,
+        "json_file": str(json_path),
+        "md_file": str(md_path),
+        "filename": base_filename,
+    }
+
+
+# 11. Static Files & Root Route
 static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
