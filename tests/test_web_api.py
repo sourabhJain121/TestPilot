@@ -149,3 +149,37 @@ def test_api_guardrails_audit():
     assert "audit_logs" in data
     assert isinstance(data["audit_logs"], list)
 
+
+def test_api_zero_clone_testgen():
+    """Verify in-memory zero-clone test case synthesis from public GitHub repos."""
+    res = client.post("/api/repo/zero-clone-testgen", json={
+        "repo_url": "https://github.com/pallets/flask/blob/main/src/flask/app.py"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "SUCCESS"
+    assert data["zero_clone"] is True
+    assert data["repo"] == "flask"
+    assert data["total_extracted_functions"] >= 10
+    assert "def test_" in data["generated_test_suite"]
+
+
+def test_api_report_export_blast_radius():
+    """Verify POST /api/report/export handles blast radius report generation."""
+    res = client.post("/api/report/export", json={
+        "repo_name": "TestPilot",
+        "report_type": "blast_radius",
+        "data": {
+            "symbol": "calculate_order_totals",
+            "total_callers": 2,
+            "callers": [{"caller_name": "checkout_order", "blast_tier": "CRITICAL"}]
+        },
+        "markdown_content": "# Blast Radius Report\n\nTarget: calculate_order_totals"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "SAVED"
+    assert data["success"] is True
+    assert "blast_radius" in data["json_file"]
+
+

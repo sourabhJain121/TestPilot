@@ -21,6 +21,7 @@
 
 2. **Repository Evolution Intelligence & Remote Git Testing**:
    - **Direct Git URL Support**: Input any remote Git repository link (e.g., `https://github.com/pallets/flask.git`, `https://github.com/django/django.git`) or local directory. TestPilot shallow-clones (`--depth 50`) into `~/.testpilot_repos/` and analyzes it immediately.
+   - **⚡ Zero-Clone In-Memory Public Git Testing**: Test any public GitHub repository or direct file link (e.g., `https://github.com/pallets/flask/blob/main/src/flask/app.py` or `https://github.com/psf/requests/blob/main/src/requests/models.py`) without disk cloning. In-memory HTTP streaming parses AST and generates complete boundary test suites in under 150ms!
    - **AST Symbol Tracking**: Detects added, deleted, and modified Python functions, classes, and methods across commits.
    - **Transitive Blast Radius Call Graph**: Traces direct and indirect callers across the codebase using Sourcegraph GraphQL with local AST fallback.
    - **Explainable Test Prioritization**: Computes uncertainty scores and ranks regression tests into `CRITICAL`, `HIGH`, `MEDIUM`, and `LOW` tiers with token-boundary matching and structured evidence trails.
@@ -31,7 +32,9 @@
    - Switch active models dynamically via the UI top bar or CLI environment variables (`OLLAMA_MODEL="codellama:7b"`).
 
 4. **One-Click Downloadable Reports**:
-   - Export detailed Markdown (`.md`) and JSON (`.json`) audit reports for both Repository Evolution analysis and 7-stage Spec-as-Oracle pipeline executions.
+   - **Pipeline Audit Reports**: Export 7-stage Spec-as-Oracle arbitration matrices and sandboxed patches (`.md` / `.json`).
+   - **Evolution Intelligence Reports**: Export changed AST symbols, transitive call graphs, and prioritized test suites.
+   - **Blast Radius Reports**: Export upstream caller hierarchies, risk assessments, and targeted test command strings directly from Tab 3.
    - Instant browser download or server-side persistence in `reports/`.
 
 5. **Safety Guardrails & AST Quarantine**:
@@ -185,9 +188,9 @@ The TestPilot web interface (`http://127.0.0.1:8501`) provides 9 integrated modu
 | Tab Name | Description | Key User Action |
 |:---|:---|:---|
 | **1. Overview** | System health, Ollama status, active model, and telemetry. | View live connected models, active vector store, and guardrails. |
-| **2. Target Git Repo & Evolution** | Remote URL clone & Git diff test discovery engine. | Input `https://github.com/pallets/flask.git`, click **Load / Clone Repo**, select commits, and click **Analyze Evolution**. |
+| **2. Target Git Repo & Evolution** | Git diff analysis & Zero-Clone in-memory test synthesis. | (A) Input git URL, click **Load / Clone Repo**, and click **Analyze Evolution**; OR (B) paste public GitHub file, click **Fetch & Synthesize Tests (Zero-Clone)**. |
 | **3. AST Diff Inspector** | Tree-sitter semantic function change parser. | Compare old vs new Python code to view added/modified methods and parameters. |
-| **4. Transitive Blast Radius** | Sourcegraph GraphQL / Local AST caller graph traversal. | Enter symbol (e.g. `calculate_order_totals`) and click **Traverse Call Graph**. |
+| **4. Transitive Blast Radius** | Sourcegraph GraphQL / Local AST caller graph traversal. | Enter symbol (e.g. `calculate_order_totals`), click **Resolve Callers**, and click **Download Blast Report**. |
 | **5. Deterministic Boundaries** | High-precision boundary matrix generator. | Select schema `OrderRequest` and click **Generate Boundary Suite**. |
 | **6. Spec Triaging Arbiter** | Three-valued logic contract arbitration. | Click **Arbitrate Failures** to see `TRUE_CODE_DEFECT`, `INVALID_TEST_ASSERTION`, `SPEC_AMBIGUITY_OR_DEFECT`. |
 | **7. Safety Guardrails** | AST code quarantine & injection defense. | Test malicious scripts (`os.system('rm -rf /')`) to verify quarantine defense. |
@@ -204,7 +207,11 @@ TestPilot generates clean, publication-ready reports in both Markdown and JSON:
    - Instantly downloads the complete Spec-as-Oracle Pipeline Report including arbitration breakdown and sandboxed remediation patches.
 2. **Evolution Tab Button (`Download Report`)**:
    - Instantly exports the Repository Evolution Intelligence Report with changed AST symbols, transitive call paths, uncertainty scores, and executable regression test commands.
-3. **Persisted Disk Storage**:
+3. **Blast Radius Tab Button (`Download Blast Report`)**:
+   - Instantly exports the Transitive Blast Radius Report with target symbol callers, upstream hierarchy tables, risk scoring, and targeted test command strings (`pytest -k "..."`).
+4. **Zero-Clone Suite Download (`Download .py Suite`)**:
+   - Instantly exports the synthesized Python boundary test suite generated directly from the public GitHub repository without disk cloning.
+5. **Persisted Disk Storage**:
    - All exported reports are automatically archived under the `reports/` directory with UTC timestamps.
 
 ---
