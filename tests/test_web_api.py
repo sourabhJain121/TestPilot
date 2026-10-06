@@ -164,6 +164,23 @@ def test_api_zero_clone_testgen():
     assert "def test_" in data["generated_test_suite"]
 
 
+def test_api_zero_clone_testgen_with_query_params():
+    """Verify in-memory zero-clone test case synthesis handles URLs with query parameters and non-main default branches."""
+    res = client.post("/api/repo/zero-clone-testgen", json={
+        "repo_url": "home-assistant/core?utm_source=chatgpt.com"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "SUCCESS"
+    assert data["zero_clone"] is True
+    assert data["owner"] == "home-assistant"
+    assert data["repo"] == "core"
+    assert data["branch"] in ("dev", "master")
+    assert "homeassistant" in data["resolved_file"]
+    assert data["total_extracted_functions"] >= 5
+    assert "def test_" in data["generated_test_suite"]
+
+
 def test_api_report_export_blast_radius():
     """Verify POST /api/report/export handles blast radius report generation."""
     res = client.post("/api/report/export", json={

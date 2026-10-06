@@ -1099,6 +1099,7 @@
           </div>
           <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
             <span class="text-slate-500">Quick presets:</span>
+            <button onclick="setZeroClonePreset('https://github.com/home-assistant/core')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-amber-300 font-mono text-[10px] transition border border-slate-700">Home Assistant (core)</button>
             <button onclick="setZeroClonePreset('https://github.com/pallets/flask/blob/main/src/flask/app.py')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-amber-300 font-mono text-[10px] transition border border-slate-700">Flask (app.py)</button>
             <button onclick="setZeroClonePreset('https://github.com/psf/requests/blob/main/src/requests/models.py')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-amber-300 font-mono text-[10px] transition border border-slate-700">Requests (models.py)</button>
             <button onclick="setZeroClonePreset('https://github.com/fastapi/fastapi/blob/master/fastapi/applications.py')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-amber-300 font-mono text-[10px] transition border border-slate-700">FastAPI (applications.py)</button>
@@ -3058,10 +3059,16 @@
     }
 
     async function runZeroCloneTestGen() {
-      const url = document.getElementById('zero-clone-repo-input')?.value?.trim();
+      let url = document.getElementById('zero-clone-repo-input')?.value?.trim() || '';
       if (!url) {
         alert('Please enter a valid GitHub repository or file URL!');
         return;
+      }
+
+      // Sanitize URL: strip query parameters (?utm_source=...), fragments (#...), trailing slashes, and .git
+      url = url.split('?')[0].split('#')[0].trim().replace(/\/+$/, '');
+      if (document.getElementById('zero-clone-repo-input')) {
+        document.getElementById('zero-clone-repo-input').value = url;
       }
 
       const btn = document.getElementById('btn-run-zero-clone');

@@ -499,89 +499,178 @@ def zero_clone_testgen(request: ZeroCloneRequest) -> dict[str, Any]:
     Fetches raw source code directly via HTTP, parses AST structure in-memory,
     and synthesizes deterministic boundary test suites without disk cloning.
     """
-    input_url = request.repo_url.strip()
-    if not input_url:
+    raw_input = request.repo_url.strip()
+    if not raw_input:
         raise HTTPException(status_code=400, detail="Repository URL or file link is required.")
 
-    owner, repo, branch, file_path = None, None, request.branch or "main", request.file_path
+    # 1. Sanitize input: strip query parameters (?utm_source=...), fragments (#...), and trailing slashes / .git
+    clean_url = raw_input.split("?")[0].split("#")[0].strip().rstrip("/")
+    clean_url = re.sub(r"\.git$", "", clean_url)
 
-    # Case 1: GitHub blob URL e.g. https://github.com/pallets/flask/blob/main/src/flask/app.py
-    m_blob = re.search(r"github\.com/([^/]+)/([^/]+)/blob/([^/]+)/(.+)", input_url)
-    if m_blob:
-        owner = m_blob.group(1)
-        repo = m_blob.group(2)
-        branch = m_blob.group(3)
-        file_path = m_blob.group(4)
-    else:
-        # Case 2: raw.githubusercontent.com
-        m_raw = re.search(r"raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)", input_url)
-        if m_raw:
-            owner = m_raw.group(1)
-            repo = m_raw.group(2)
-            branch = m_raw.group(3)
-            file_path = m_raw.group(4)
-        else:
-            # Case 3: Repo root e.g. https://github.com/pallets/flask or https://github.com/pallets/flask.git
-            m_repo = re.search(r"github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/)?$", input_url)
-            if m_repo:
-                owner = m_repo.group(1)
-                repo = m_repo.group(2)
-            else:
-                raise HTTPException(status_code=400, detail=f"Unsupported or invalid GitHub URL: {input_url}")
+    # 2. Extract path after github.com or git@github.com:
+    clean_path = re.sub(r"^(?:https?://)?(?:www\.)?github\.com/", "", clean_url)
+    clean_path = re.sub(r"^git@github\.com:", "", clean_path)
+    clean_path = re.sub(r"^(?:https?://)?raw\.githubusercontent\.com/", "", clean_path)
+    clean_path = clean_path.strip("/")
 
-    # If file_path not explicitly identified, try common candidates
-    candidate_paths = [file_path] if file_path else [
-        f"src/{repo}/app.py",
+    parts = [p for p in clean_path.split("/") if p]
+    if len(parts) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid GitHub repository URL: '{raw_input}'. Expected format: https://github.com/owner/repo",
+        )
+
+    owner = parts[0]
+    repo = parts[1]
+    branch = request.branch
+    file_path = request.file_path
+
+    # Check for /blob/ or /tree/ in URL
+    if len(parts) >= 5 and parts[2] in ("blob", "tree"):
+        branch = parts[3]
+        file_path = "/".join(parts[4:])
+    elif len(parts) == 4 and parts[2] in ("blob", "tree"):
+        branch = parts[3]
+    elif len(parts) >= 3 and parts[2] not in ("blob", "tree") and "." in parts[-1]:
+        # raw.githubusercontent.com style: owner/repo/branch/path/to/file.py
+        branch = parts[2]
+        file_path = "/".join(parts[3:])
+
+    # 3. Determine candidate branches to inspect
+    branches_to_try: list[str] = []
+    if branch:
+        branches_to_try.append(branch)
+    if request.branch and request.branch not in branches_to_try:
+        branches_to_try.append(request.branch)
+
+    # Auto-detect remote default branch via GitHub public repo metadata API
+    try:
+        api_url = f"https://api.github.com/repos/{owner}/{repo}"
+        req_meta = urllib.request.Request(api_url, headers={"User-Agent": "TestPilot-AI/1.0"})
+        with urllib.request.urlopen(req_meta, timeout=4) as resp:
+            if resp.status == 200:
+                meta_json = json.loads(resp.read().decode("utf-8"))
+                remote_default_branch = meta_json.get("default_branch")
+                if remote_default_branch and remote_default_branch not in branches_to_try:
+                    branches_to_try.insert(0, remote_default_branch)
+                elif remote_default_branch:
+                    branches_to_try.remove(remote_default_branch)
+                    branches_to_try.insert(0, remote_default_branch)
+    except Exception:
+        pass
+
+    for fallback_b in ["main", "dev", "master", "trunk"]:
+        if fallback_b not in branches_to_try:
+            branches_to_try.append(fallback_b)
+
+    # 4. Generate intelligent file path candidates based on repo/owner structure
+    owner_clean = owner.replace("-", "_").lower()
+    owner_condensed = owner.replace("-", "").lower()
+    repo_clean = repo.replace("-", "_").lower()
+    repo_condensed = repo.replace("-", "").lower()
+
+    candidate_paths: list[str] = [file_path] if file_path else [
+        # Owner-derived package layouts (e.g. home-assistant/core -> homeassistant/core.py)
+        f"{owner_condensed}/core.py",
+        f"{owner_clean}/core.py",
+        f"{owner_condensed}/app.py",
+        f"{owner_condensed}/__init__.py",
+        f"{owner_clean}/__init__.py",
+        # Repo-derived package layouts
+        f"{repo}/core.py",
+        f"{repo_clean}/core.py",
+        f"{repo_condensed}/core.py",
         f"{repo}/app.py",
+        f"{repo_clean}/app.py",
+        f"{repo_condensed}/app.py",
+        f"{repo}/__init__.py",
+        f"{repo_clean}/__init__.py",
+        # src/ layouts
+        f"src/{repo}/app.py",
+        f"src/{repo_clean}/app.py",
+        f"src/{repo}/core.py",
+        f"src/{repo_clean}/core.py",
+        f"src/{repo}/__init__.py",
+        f"src/{repo_clean}/__init__.py",
+        f"src/{owner_condensed}/core.py",
+        f"src/{owner_condensed}/app.py",
+        # Common root filenames
         "app.py",
         "main.py",
+        "core.py",
         "service.py",
         "models.py",
-        f"src/{repo}/core.py",
+        "server.py",
+        "client.py",
     ]
 
     code = None
     resolved_path = None
+    resolved_branch = None
     t0 = time.time()
 
-    for cand in candidate_paths:
-        if not cand:
-            continue
-        raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{cand}"
-        try:
-            req = urllib.request.Request(raw_url, headers={"User-Agent": "TestPilot-AI/1.0"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                if resp.status == 200:
-                    code = resp.read().decode("utf-8", errors="replace")
-                    resolved_path = cand
-                    break
-        except Exception:
-            continue
-
-    if not code:
-        # If default branch wasn't main, try master
-        if branch == "main":
-            for cand in candidate_paths:
-                if not cand:
-                    continue
-                raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/master/{cand}"
-                try:
-                    req = urllib.request.Request(raw_url, headers={"User-Agent": "TestPilot-AI/1.0"})
-                    with urllib.request.urlopen(req, timeout=8) as resp:
-                        if resp.status == 200:
-                            code = resp.read().decode("utf-8", errors="replace")
+    # 5. Probe candidate raw URLs
+    for b in branches_to_try:
+        for cand in candidate_paths:
+            if not cand:
+                continue
+            raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{b}/{cand}"
+            try:
+                req = urllib.request.Request(raw_url, headers={"User-Agent": "TestPilot-AI/1.0"})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    if resp.status == 200:
+                        content = resp.read().decode("utf-8", errors="replace")
+                        if content.strip():
+                            code = content
                             resolved_path = cand
-                            branch = "master"
+                            resolved_branch = b
                             break
-                except Exception:
-                    continue
+            except Exception:
+                continue
+        if code:
+            break
+
+    # 6. Fallback: Dynamic GitHub Tree auto-discovery if candidate probe yielded nothing
+    if not code:
+        try:
+            for b in branches_to_try[:2]:
+                tree_url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{b}?recursive=1"
+                req_t = urllib.request.Request(tree_url, headers={"User-Agent": "TestPilot-AI/1.0"})
+                with urllib.request.urlopen(req_t, timeout=5) as resp:
+                    if resp.status == 200:
+                        tree_data = json.loads(resp.read().decode("utf-8"))
+                        for item in tree_data.get("tree", []):
+                            p = item.get("path", "")
+                            if (
+                                p.endswith(".py")
+                                and not any(x in p for x in ("test", "setup.py", "conftest", "__pycache__", ".venv", "docs/"))
+                            ):
+                                raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{b}/{p}"
+                                req_f = urllib.request.Request(raw_url, headers={"User-Agent": "TestPilot-AI/1.0"})
+                                with urllib.request.urlopen(req_f, timeout=5) as resp_f:
+                                    if resp_f.status == 200:
+                                        content = resp_f.read().decode("utf-8", errors="replace")
+                                        if content.strip():
+                                            code = content
+                                            resolved_path = p
+                                            resolved_branch = b
+                                            break
+                    if code:
+                        break
+        except Exception:
+            pass
 
     if not code:
         raise HTTPException(
             status_code=404,
-            detail=f"Could not locate a valid Python source file in {owner}/{repo} on branch {branch}. "
-                   f"Please provide the direct file link, e.g. https://github.com/{owner}/{repo}/blob/{branch}/path/to/file.py",
+            detail=(
+                f"Could not locate a valid Python source file in {owner}/{repo}. "
+                f"Probed branches: {', '.join(branches_to_try)}. "
+                f"Please provide a direct file link (e.g. https://github.com/{owner}/{repo}/blob/{branches_to_try[0]}/path/to/file.py)."
+            ),
         )
+
+    branch = resolved_branch or branches_to_try[0]
 
     # In-memory AST parsing
     try:
