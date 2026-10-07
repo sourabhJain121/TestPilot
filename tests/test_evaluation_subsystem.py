@@ -298,3 +298,165 @@ def test_testpilot_rag_baseline(monkeypatch):
         assert "TestPilot + Repository RAG" in res.name
         assert res.selected_count >= 0
 
+
+def test_overview_primary_evaluation_matrix_structure():
+    """
+    CRITICAL RESEARCH INTEGRITY RULE:
+    Primary matrix must contain all 6 research configurations.
+    Evaluated rows must contain verified metrics.
+    Un-evaluated rows (Sourcegraph, RAG, SG+RAG) must strictly return
+    status='Not evaluated yet' with NO fabricated metrics (values=None, display='—').
+    """
+    engine = EvaluationEngine()
+    summary = engine.get_overview_summary()
+
+    matrix = summary.get("primary_matrix")
+    assert matrix is not None
+    assert len(matrix) == 6
+
+    configs = [row["configuration"] for row in matrix]
+    assert configs == [
+        "Full Regression",
+        "Naive Baseline",
+        "TestPilot",
+        "TestPilot + Sourcegraph",
+        "TestPilot + Repository RAG",
+        "TestPilot + Sourcegraph + Repository RAG",
+    ]
+
+    # Check evaluated rows
+    for row in matrix[:3]:
+        assert row["status"] == "Evaluated"
+        assert row["badge"] == "✓ Evaluated"
+        assert row["is_evaluated"] is True
+        assert row["selected_tests"] is not None
+        assert row["tp"] is not None
+        assert row["fp"] is not None
+        assert row["fn"] is not None
+        assert row["precision"] is not None
+        assert row["recall"] is not None
+        assert row["f1"] is not None
+        assert row["test_reduction"] is not None
+        assert row["precision_display"] != "—"
+        assert row["recall_display"] != "—"
+        assert row["f1_display"] != "—"
+        assert row["test_reduction_display"] != "—"
+
+    # Check un-evaluated rows (Sourcegraph, Repository RAG, SG + RAG)
+    for row in matrix[3:]:
+        assert row["status"] == "Not evaluated yet"
+        assert row["badge"] == "◐ Not Evaluated Yet"
+        assert row["is_evaluated"] is False
+        assert row["selected_tests"] is None
+        assert row["ground_truth_positives"] is None
+        assert row["tp"] is None
+        assert row["fp"] is None
+        assert row["fn"] is None
+        assert row["precision"] is None
+        assert row["recall"] is None
+        assert row["f1"] is None
+        assert row["test_reduction"] is None
+        assert row["selected_tests_display"] == "—"
+        assert row["precision_display"] == "—"
+        assert row["recall_display"] == "—"
+        assert row["f1_display"] == "—"
+        assert row["test_reduction_display"] == "—"
+        assert "pending" in row["notes"].lower()
+
+
+def test_overview_ablation_plan_structure():
+    """Verify ablation plan matrix defines all 6 architectural experiment rows."""
+    engine = EvaluationEngine()
+    summary = engine.get_overview_summary()
+
+    plan = summary.get("ablation_plan")
+    assert plan is not None
+    assert len(plan) == 6
+
+    experiments = [row["experiment"] for row in plan]
+    assert experiments == [
+        "Full Regression",
+        "Naive Baseline",
+        "TestPilot",
+        "TestPilot + Sourcegraph",
+        "TestPilot + Repository RAG",
+        "TestPilot + Sourcegraph + Repository RAG",
+    ]
+
+    # Verify RAG and Sourcegraph rows indicate pending quantitative ablation
+    rag_row = next(r for r in plan if r["experiment"] == "TestPilot + Repository RAG")
+    assert rag_row["status"] == "Not evaluated yet"
+    assert rag_row["repository_rag"] == "Yes"
+    assert rag_row["codellama_validation"] == "Yes"
+    assert rag_row["sourcegraph"] == "No"
+    assert rag_row["deterministic_repo_intelligence"] == "Yes"
+    assert "Pending benchmark" in rag_row["metrics"]
+
+    sg_row = next(r for r in plan if r["experiment"] == "TestPilot + Sourcegraph")
+    assert sg_row["status"] == "Not evaluated yet"
+    assert sg_row["sourcegraph"] == "Yes"
+    assert sg_row["repository_rag"] == "No"
+    assert "Pending benchmark" in sg_row["metrics"]
+
+
+def test_overview_status_cards_and_benchmark_summary():
+    """Verify status cards accurately report component implementation and evaluation status."""
+    engine = EvaluationEngine()
+    summary = engine.get_overview_summary()
+
+    cards = summary.get("status_cards")
+    assert cards is not None
+    assert len(cards) == 5
+
+    card_map = {c["title"]: c for c in cards}
+    assert "CORE TESTPILOT" in card_map
+    assert card_map["CORE TESTPILOT"]["status"] == "Evaluated"
+
+    assert "SOURCEGRAPH" in card_map
+    assert card_map["SOURCEGRAPH"]["status"] == "Implemented"
+    assert card_map["SOURCEGRAPH"]["quantitative_ablation"] == "Pending"
+
+    assert "REPOSITORY RAG" in card_map
+    assert card_map["REPOSITORY RAG"]["status"] == "Implemented"
+    assert card_map["REPOSITORY RAG"]["quantitative_evaluation"] == "Pending"
+
+    assert "CODELLAMA SEMANTIC VALIDATION" in card_map
+    assert card_map["CODELLAMA SEMANTIC VALIDATION"]["status"] == "Implemented"
+    assert card_map["CODELLAMA SEMANTIC VALIDATION"]["quantitative_evaluation"] == "Pending"
+
+    assert "EVALUATION SUITE" in card_map
+    assert card_map["EVALUATION SUITE"]["status"] == "Current Measured Baseline Available"
+
+    b_sum = summary.get("benchmark_summary")
+    assert b_sum is not None
+    assert b_sum["total_configurations"] == 6
+    assert b_sum["evaluated_configurations_count"] == 3
+    assert b_sum["pending_configurations_count"] == 3
+    assert b_sum["total_tests_positive_pool"] == 10713
+    assert b_sum["total_ground_truth"] == 20
+
+
+def test_overview_methodology_and_evidence():
+    """Verify methodology definitions and research evidence statements."""
+    engine = EvaluationEngine()
+    summary = engine.get_overview_summary()
+
+    meth = summary.get("methodology")
+    assert meth is not None
+    assert meth["precision"]["formula"] == "TP / (TP + FP)"
+    assert meth["recall"]["formula"] == "TP / (TP + FN)"
+    assert meth["f1"]["formula"] == "2 × Precision × Recall / (Precision + Recall)"
+    assert meth["test_reduction"]["formula"] == "1 - (Selected Tests / Total Tests)"
+
+    evidence = summary.get("research_evidence")
+    assert evidence is not None
+    assert evidence["core_evaluated"] is True
+    assert evidence["rag_evaluated"] is False
+    assert evidence["sourcegraph_evaluated"] is False
+
+    findings_text = " ".join(evidence["key_findings"])
+    assert "Repository RAG is functionally integrated and tested" in findings_text
+    assert "has not yet been quantitatively evaluated" in findings_text
+    assert "must not be claimed before running the benchmark" in findings_text
+
+

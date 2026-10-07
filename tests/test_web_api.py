@@ -221,3 +221,63 @@ def test_api_rag_query():
     assert isinstance(data["results"], list)
 
 
+def test_api_evaluation_overview_endpoint():
+    """Verify GET /api/evaluation/overview returns truthful research matrices."""
+    client = TestClient(app)
+    res = client.get("/api/evaluation/overview")
+    assert res.status_code == 200
+    data = res.json()
+
+    assert "primary_matrix" in data
+    assert len(data["primary_matrix"]) == 6
+
+    # Verify evaluated vs pending distinction
+    configs = {row["configuration"]: row for row in data["primary_matrix"]}
+    assert configs["Full Regression"]["status"] == "Evaluated"
+    assert configs["Naive Baseline"]["status"] == "Evaluated"
+    assert configs["TestPilot"]["status"] == "Evaluated"
+
+    assert configs["TestPilot + Sourcegraph"]["status"] == "Not evaluated yet"
+    assert configs["TestPilot + Sourcegraph"]["precision"] is None
+    assert configs["TestPilot + Sourcegraph"]["precision_display"] == "—"
+
+    assert configs["TestPilot + Repository RAG"]["status"] == "Not evaluated yet"
+    assert configs["TestPilot + Repository RAG"]["precision"] is None
+    assert configs["TestPilot + Repository RAG"]["f1_display"] == "—"
+
+    assert configs["TestPilot + Sourcegraph + Repository RAG"]["status"] == "Not evaluated yet"
+    assert configs["TestPilot + Sourcegraph + Repository RAG"]["test_reduction_display"] == "—"
+
+    # Status cards
+    assert "status_cards" in data
+    assert len(data["status_cards"]) == 5
+
+    # Ablation plan
+    assert "ablation_plan" in data
+    assert len(data["ablation_plan"]) == 6
+
+    # Methodology & Evidence
+    assert "methodology" in data
+    assert "research_evidence" in data
+    assert data["research_evidence"]["rag_evaluated"] is False
+
+
+def test_api_evaluation_page_html_renders():
+    """Verify that root index.html serves the new evaluation matrices and structure."""
+    client = TestClient(app)
+    res = client.get("/")
+    assert res.status_code == 200
+    html = res.text
+
+    assert "Primary Research Evaluation Matrix" in html
+    assert "Evaluation &amp; Ablation Plan" in html or "Evaluation & Ablation Plan" in html
+    assert "Research Evaluation Status" in html
+    assert "Experiment Status Legend" in html
+    assert "Evaluation Methodology &amp; Metric Definitions" in html or "Evaluation Methodology & Metric Definitions" in html
+    assert "CURRENT RESEARCH EVIDENCE" in html
+    assert "eval-status-cards-grid" in html
+    assert "eval-primary-matrix-body" in html
+    assert "eval-ablation-plan-body" in html
+
+
+
