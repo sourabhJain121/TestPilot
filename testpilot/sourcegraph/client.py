@@ -296,6 +296,87 @@ class LocalCodeGraphFallback:
 
         return callers
 
+    def find_definitions(self, symbol_name: str) -> list[dict[str, Any]]:
+        """Find definitions of functions or classes matching symbol_name across Python files."""
+        definitions: list[dict[str, Any]] = []
+        for py_file in self.repo_root.rglob("*.py"):
+            parts = py_file.parts
+            if any(p.startswith(".") or p in ("venv", "env", "site-packages", "htmlcov", ".venv") for p in parts):
+                continue
+            try:
+                source = py_file.read_text(encoding="utf-8", errors="ignore")
+                if symbol_name not in source:
+                    continue
+                tree = ast.parse(source, filename=str(py_file))
+                rel_path = str(py_file.relative_to(self.repo_root)).replace("\\", "/")
+                for node in ast.walk(tree):
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == symbol_name:
+                        definitions.append({
+                            "symbol_name": symbol_name,
+                            "file_path": rel_path,
+                            "line_number": node.lineno,
+                            "kind": "FUNCTION",
+                            "source_type": "local_ast_fallback",
+                        })
+                    elif isinstance(node, ast.ClassDef) and node.name == symbol_name:
+                        definitions.append({
+                            "symbol_name": symbol_name,
+                            "file_path": rel_path,
+                            "line_number": node.lineno,
+                            "kind": "CLASS",
+                            "source_type": "local_ast_fallback",
+                        })
+            except Exception:
+                continue
+        return definitions
+
+    def find_references(self, symbol_name: str) -> list[dict[str, Any]]:
+        """Find symbol references, identifiers, and attribute usages across Python files."""
+        references: list[dict[str, Any]] = []
+        for py_file in self.repo_root.rglob("*.py"):
+            parts = py_file.parts
+            if any(p.startswith(".") or p in ("venv", "env", "site-packages", "htmlcov", ".venv") for p in parts):
+                continue
+            try:
+                source = py_file.read_text(encoding="utf-8", errors="ignore")
+                if symbol_name not in source:
+                    continue
+                rel_path = str(py_file.relative_to(self.repo_root)).replace("\\", "/")
+                lines = source.splitlines()
+                for line_idx, line in enumerate(lines, start=1):
+                    if symbol_name in line:
+                        references.append({
+                            "symbol_name": symbol_name,
+                            "file_path": rel_path,
+                            "line_number": line_idx,
+                            "line_content": line.strip(),
+                            "source_type": "local_ast_fallback",
+                        })
+            except Exception:
+                continue
+        return references
+
+    def find_test_references(self, symbol_name: str) -> list[dict[str, Any]]:
+        """Find references to symbol_name specifically within test suites."""
+        all_refs = self.find_references(symbol_name)
+        return [
+            r for r in all_refs
+            if "test" in r.get("file_path", "").lower()
+        ]
+
+    def find_class_usages(self, class_name: str) -> list[dict[str, Any]]:
+        """Find usages, instantiations, and inheritance of class_name."""
+        return self.find_references(class_name)
+
+    def search_code(self, query_str: str) -> list[dict[str, Any]]:
+        """Full-text code search across repository Python files."""
+        return self.find_references(query_str)
+
+    def search_functions(self, func_name: str) -> list[dict[str, Any]]:
+        """Search function definitions matching func_name."""
+        defs = self.find_definitions(func_name)
+        return [d for d in defs if d.get("kind") == "FUNCTION"]
+
 
 class SourcegraphClient:
     """
@@ -463,3 +544,88 @@ class SourcegraphClient:
 
         # Resilient Local AST Fallback
         return self.local_fallback.find_callers(function_name, file_path, target_class_name=class_name)
+
+    def find_definitions(self, symbol_name: str) -> list[dict[str, Any]]:
+        """Find definitions of symbol_name via Sourcegraph or local AST fallback."""
+        if self.is_available():
+            syms = self.query_symbols(symbol_name)
+            if syms:
+                defs = []
+                for match in syms:
+                    f_path = match.get("file", {}).get("path")
+                    for sym in match.get("symbols", []):
+                        if sym.get("name") == symbol_name:
+                            defs.append({
+                                "symbol_name": symbol_name,
+                                "file_path": f_path,
+                                "line_number": sym.get("location", {}).get("range", {}).get("start", {}).get("line"),
+                                "kind": sym.get("kind", "FUNCTION"),
+                                "source_type": "sourcegraph_graphql",
+                            })
+                if defs:
+                    return defs
+        return self.local_fallback.find_definitions(symbol_name)
+
+    def find_references(self, symbol_name: str) -> list[dict[str, Any]]:
+        """Find references to symbol_name via Sourcegraph or local AST fallback."""
+        if self.is_available():
+            callers = self.get_function_callers(symbol_name)
+            if callers:
+                return callers
+        return self.local_fallback.find_references(symbol_name)
+
+    def find_test_references(self, symbol_name: str) -> list[dict[str, Any]]:
+        """Find references to symbol_name inside test files."""
+        refs = self.find_references(symbol_name)
+        return [r for r in refs if "test" in r.get("file_path", "").lower()]
+
+    def find_class_usages(self, class_name: str) -> list[dict[str, Any]]:
+        """Find usages and instantiations of class_name."""
+        return self.find_references(class_name)
+
+    def search_code(self, query_str: str) -> list[dict[str, Any]]:
+        """Search code occurrences across the repository."""
+        return self.local_fallback.search_code(query_str)
+
+    def search_functions(self, func_name: str) -> list[dict[str, Any]]:
+        """Search function definitions matching func_name."""
+        return self.local_fallback.search_functions(func_name)
+
+    def normalize_evidence(
+        self,
+        query: str,
+        symbol: str,
+        results: list[dict[str, Any]],
+        error_state: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """
+        Normalize Sourcegraph code intelligence results into standardized evidence schema.
+        Distinguishes:
+        - Sourcegraph available + evidence found
+        - Sourcegraph available + no evidence found
+        - Sourcegraph unavailable (fallback active)
+        """
+        available = self.is_available()
+        has_evidence = len(results) > 0
+        if available and has_evidence:
+            status = "AVAILABLE_EVIDENCE_FOUND"
+        elif available and not has_evidence:
+            status = "AVAILABLE_NO_EVIDENCE"
+        else:
+            status = "SOURCEGRAPH_UNAVAILABLE_FALLBACK"
+
+        source_type = results[0].get("source_type", "local_ast_fallback") if results else (
+            "sourcegraph_graphql" if available else "local_ast_fallback"
+        )
+
+        return {
+            "query": query,
+            "symbol": symbol,
+            "availability": "AVAILABLE" if available else "UNAVAILABLE",
+            "has_evidence": has_evidence,
+            "status": status,
+            "results_count": len(results),
+            "results": results[:10],
+            "source_type": source_type,
+            "error_state": error_state,
+        }

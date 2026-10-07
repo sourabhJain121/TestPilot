@@ -1851,6 +1851,12 @@
             </select>
           </div>
 
+          <!-- Experimental RAG Semantic Validation Toggle -->
+          <label class="flex items-center space-x-1.5 bg-slate-950 border border-slate-700 hover:border-purple-600 rounded-lg px-2.5 py-1 text-xs cursor-pointer select-none" title="Experimental: Enable CodeLlama Semantic Validation & Repository Code RAG">
+            <input type="checkbox" id="pipeline-enable-semantic-rag" class="rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-0">
+            <span class="text-purple-300 font-mono text-[10px]">RAG + CodeLlama</span>
+          </label>
+
           <!-- Download Evolution Report Button -->
           <button onclick="downloadEvolutionReport()" id="btn-download-evo" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 text-xs font-medium transition shadow-sm" title="Download formatted Evolution Report">
             <i data-lucide="download" class="w-3.5 h-3.5 text-cyan-400"></i>
@@ -3903,12 +3909,15 @@
         const targetRef = targetRefVal && targetRefVal.length > 0 ? targetRefVal : 'HEAD';
         const maxDepth = parseInt(document.getElementById('evo-max-depth')?.value, 10) || 3;
 
+        const isSemanticRag = document.getElementById('pipeline-enable-semantic-rag')?.checked || false;
         const reqPayload = {
           repo_path: currentRepoPath || '.',
           base_ref: baseRef,
           target_ref: targetRef,
           max_depth: maxDepth,
           enable_evolution: true,
+          enable_semantic_validation: isSemanticRag,
+          enable_sourcegraph: true,
           spec_path: 'testbed/openapi.json',
           test_path: 'tests/generated/test_order_service.py',
           target_file: 'testbed/app/services/order_service.py',
@@ -4078,6 +4087,17 @@
                   ${t.targeted_symbol ? `<span class="text-slate-500">&rarr; targets <strong class="text-yellow-400">${escapeHtml(t.targeted_symbol)}</strong></span>` : ''}
                 </div>
                 <div class="text-[11px] text-slate-300 leading-relaxed">${escapeHtml(t.reason || t.selection_reason || 'Coupled via AST call-site')}</div>
+                ${t.semantic_decision ? `
+                  <div class="mt-2 p-2 rounded bg-purple-950/40 border border-purple-800/60 text-[11px] space-y-1">
+                    <div class="flex items-center space-x-2 font-mono">
+                      <span class="font-bold text-purple-300">CodeLlama Semantic Assessment:</span>
+                      <span class="px-1.5 py-0.2 rounded text-[9px] uppercase border ${t.semantic_decision === 'HIGH' ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : (t.semantic_decision === 'MEDIUM' ? 'bg-cyan-950 text-cyan-300 border-cyan-800' : 'bg-slate-900 text-slate-400 border-slate-800')}">${t.semantic_decision}</span>
+                      ${t.semantic_confidence !== undefined && t.semantic_confidence !== null ? `<span class="text-slate-400 text-[10px]">Confidence: ${(t.semantic_confidence * 100).toFixed(0)}%</span>` : ''}
+                    </div>
+                    ${t.semantic_reason ? `<div class="text-slate-300">${escapeHtml(t.semantic_reason)}</div>` : ''}
+                    ${(t.semantic_supporting_evidence && t.semantic_supporting_evidence.length > 0) ? `<div class="text-[10px] text-purple-300/80 font-mono">Evidence: ${escapeHtml(t.semantic_supporting_evidence.join(', '))}</div>` : ''}
+                  </div>
+                ` : ''}
                 ${uncNotice}
                 <div class="p-1.5 rounded bg-slate-950 font-mono text-[10px] text-cyan-300 overflow-x-auto">${escapeHtml(cmd)}</div>
               </div>

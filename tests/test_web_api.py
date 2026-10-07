@@ -200,3 +200,24 @@ def test_api_report_export_blast_radius():
     assert "blast_radius" in data["json_file"]
 
 
+def test_api_sourcegraph_search():
+    client = TestClient(app)
+    res = client.get("/api/sourcegraph/search?query=calculate_total&search_type=references")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["query"] == "calculate_total"
+    assert "server_status" in data
+    assert "normalized_evidence" in data
+    assert isinstance(data["results"], list)
+
+
+def test_api_rag_query():
+    client = TestClient(app)
+    res = client.post("/api/rag/query", json={"query": "order total test", "top_k": 2})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["query"] == "order total test"
+    assert "total_results" in data
+    assert isinstance(data["results"], list)
+
+

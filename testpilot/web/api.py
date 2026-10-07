@@ -178,6 +178,78 @@ def get_callers(symbol: str = "calculate_order_totals", file: Optional[str] = No
     }
 
 
+@app.get("/api/sourcegraph/search")
+def search_sourcegraph(query: str, search_type: str = "references") -> dict[str, Any]:
+    """Search Sourcegraph code intelligence (definitions, references, tests, functions)."""
+    sg = SourcegraphClient()
+    is_live = sg.is_alive()
+    if search_type == "definitions":
+        res = sg.find_definitions(query)
+    elif search_type == "test_references":
+        res = sg.find_test_references(query)
+    elif search_type == "class_usages":
+        res = sg.find_class_usages(query)
+    elif search_type == "functions":
+        res = sg.search_functions(query)
+    else:
+        res = sg.find_references(query)
+
+    norm = sg.normalize_evidence(query=query, symbol=query, results=res)
+    return {
+        "query": query,
+        "search_type": search_type,
+        "server_status": "ONLINE" if is_live else "FALLBACK",
+        "total_matches": len(res),
+        "normalized_evidence": norm,
+        "results": res,
+    }
+
+
+class RepoIndexRequest(BaseModel):
+    repo_path: Optional[str] = "."
+
+
+class RepoQueryRequest(BaseModel):
+    query: str
+    top_k: Optional[int] = 5
+    repo_path: Optional[str] = "."
+
+
+@app.post("/api/rag/index")
+def index_repo_code(payload: Optional[RepoIndexRequest] = None) -> dict[str, Any]:
+    """Index repository code units into dedicated Chroma repo_code_store collection."""
+    from testpilot.rag.repo_vector_store import RepoCodeVectorStore
+
+    req = payload or RepoIndexRequest()
+    repo_p = Path(req.repo_path or ".").expanduser().resolve()
+    if not repo_p.exists():
+        raise HTTPException(status_code=400, detail=f"Path not found: {req.repo_path}")
+
+    store = RepoCodeVectorStore(repo_root=str(repo_p))
+    units = store.index_repository(str(repo_p))
+    return {
+        "status": "SUCCESS",
+        "repo_path": str(repo_p),
+        "indexed_units": len(units),
+        "collection": "repo_code_store",
+    }
+
+
+@app.post("/api/rag/query")
+def query_repo_code(payload: RepoQueryRequest) -> dict[str, Any]:
+    """Retrieve semantic repository code context for a query."""
+    from testpilot.rag.repo_vector_store import RepoCodeVectorStore
+
+    repo_p = Path(payload.repo_path or ".").expanduser().resolve()
+    store = RepoCodeVectorStore(repo_root=str(repo_p))
+    results = store.retrieve_code_context(query=payload.query, top_k=payload.top_k or 5)
+    return {
+        "query": payload.query,
+        "total_results": len(results),
+        "results": results,
+    }
+
+
 # 4. Deterministic OpenAPI Boundary Matrix
 @app.post("/api/testgen/deterministic")
 def generate_deterministic_tests(payload: Optional[DeterministicGenRequest] = None) -> dict[str, Any]:

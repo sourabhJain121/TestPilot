@@ -1017,6 +1017,12 @@ def pipeline_cmd(
     max_depth: int = typer.Option(3, "--max-depth", "-d", help="Max transitive call-graph depth (1-5)"),
     spec_path: str = typer.Option("testbed/openapi.json", "--spec-path", "-s", help="Path to OpenAPI specification"),
     skip_evolution: bool = typer.Option(False, "--skip-evolution", help="Skip Stage 0 Repository Evolution"),
+    enable_semantic_validation: bool = typer.Option(
+        False, "--enable-semantic-validation", help="Enable experimental Repository RAG & CodeLlama semantic validation"
+    ),
+    enable_sourcegraph: bool = typer.Option(
+        True, "--enable-sourcegraph/--disable-sourcegraph", help="Enable/disable Sourcegraph code intelligence"
+    ),
 ):
     """
     Run Full TestPilot Autonomous Closed-Loop Pipeline:
@@ -1030,10 +1036,12 @@ def pipeline_cmd(
     """
     target_display = target or "HEAD"
     evo_display = "DISABLED" if skip_evolution else f"{base} -> {target_display}"
+    rag_display = "ENABLED" if enable_semantic_validation else "DISABLED (baseline)"
 
     console.print(Panel.fit(
         f"[bold cyan]TestPilot AI — Full Autonomous Pipeline Run[/bold cyan]\n"
         f"Stage 0 Evolution: [bold yellow]{evo_display}[/bold yellow] | "
+        f"Semantic RAG: [bold magenta]{rag_display}[/bold magenta] | "
         f"Spec: [bold green]{spec_path}[/bold green]"
     ))
 
@@ -1044,6 +1052,8 @@ def pipeline_cmd(
         max_depth=max_depth,
         spec_path=spec_path,
         enable_evolution=not skip_evolution,
+        enable_semantic_validation=enable_semantic_validation,
+        enable_sourcegraph=enable_sourcegraph,
     )
 
     with console.status("[bold green]Executing full closed-loop testing & remediation pipeline...[/bold green]"):
@@ -1221,6 +1231,75 @@ def evaluate_cmd(
             )
         except Exception as e:
             console.print(f"[bold red]✗ Failed {cid}[/]: {e}")
+
+
+@app.command("rag-index")
+def rag_index_cmd(
+    repo_path: str = typer.Option(".", "--repo-path", "-r", help="Repository root path to index"),
+):
+    """Index repository code units into dedicated Chroma repo_code_store collection."""
+    from testpilot.rag.repo_vector_store import RepoCodeVectorStore
+
+    console.print(Panel.fit(f"[bold cyan]Indexing Repository Code Units: {repo_path}[/bold cyan]"))
+    store = RepoCodeVectorStore(repo_root=repo_path)
+    units = store.index_repository(repo_path)
+    console.print(f"[bold green]✓ Successfully indexed {len(units)} semantic code units into repo_code_store collection.[/bold green]")
+
+
+@app.command("rag-query")
+def rag_query_cmd(
+    query: str = typer.Argument(..., help="Search query or symbol"),
+    top_k: int = typer.Option(3, "--top-k", "-k", help="Number of code units to retrieve"),
+    repo_path: str = typer.Option(".", "--repo-path", "-r", help="Repository root path"),
+):
+    """Retrieve semantic repository code context using vector embeddings."""
+    from testpilot.rag.repo_vector_store import RepoCodeVectorStore
+
+    store = RepoCodeVectorStore(repo_root=repo_path)
+    results = store.retrieve_code_context(query=query, top_k=top_k)
+    table = Table(title=f"Repository RAG Retrieval Results for: {query}", show_lines=True)
+    table.add_column("Symbol", style="bold cyan", width=30)
+    table.add_column("File", style="yellow", width=25)
+    table.add_column("Type", width=12)
+    table.add_column("Similarity", width=12)
+    for r in results:
+        table.add_row(
+            r.get("qualified_symbol", ""),
+            r.get("file_path", ""),
+            r.get("symbol_type", ""),
+            f"{r.get('similarity', 0.0):.3f}",
+        )
+    console.print(table)
+
+
+@app.command("sourcegraph-query")
+def sourcegraph_query_cmd(
+    query: str = typer.Argument(..., help="Symbol or function to search"),
+    search_type: str = typer.Option("references", "--type", "-t", help="Search type: references, definitions, tests, functions"),
+):
+    """Query Sourcegraph repository code intelligence."""
+    sg = SourcegraphClient()
+    if search_type == "definitions":
+        results = sg.find_definitions(query)
+    elif search_type == "tests":
+        results = sg.find_test_references(query)
+    elif search_type == "functions":
+        results = sg.search_functions(query)
+    else:
+        results = sg.find_references(query)
+
+    norm = sg.normalize_evidence(query=query, symbol=query, results=results)
+    table = Table(title=f"Sourcegraph Results ({norm['status']}) for: {query}", show_lines=True)
+    table.add_column("File", style="bold green", width=35)
+    table.add_column("Line", width=8)
+    table.add_column("Match Content", style="dim")
+    for r in results[:15]:
+        table.add_row(
+            r.get("file_path", ""),
+            str(r.get("line_number", "")),
+            r.get("line_content", "") or r.get("preview", ""),
+        )
+    console.print(table)
 
 
 evolution_command = evolution_cmd

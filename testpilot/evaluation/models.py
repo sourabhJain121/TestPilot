@@ -16,6 +16,7 @@ class BaselineType(str, Enum):
     FULL_REGRESSION = "full_regression"
     NAIVE_NAME_MATCHING = "naive_name_matching"
     TESTPILOT = "testpilot"
+    TESTPILOT_RAG = "testpilot_rag"
 
 
 class GroundTruth(BaseModel):

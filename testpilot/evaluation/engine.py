@@ -186,6 +186,22 @@ class EvaluationEngine:
             selection_latency_ms=selection_latency_ms,
         )
 
+        # 6. Run Baseline 4: TestPilot + Repository RAG
+        start_rag = time.perf_counter()
+        res_testpilot_rag, _ = baseline_evaluator.run_testpilot_rag(
+            changed_symbols, discovered_tests
+        )
+        rag_latency_ms = (time.perf_counter() - start_rag) * 1000.0
+
+        metrics_testpilot_rag = compute_metrics(
+            predicted_tests=res_testpilot_rag.selected_tests,
+            expected_tests=case.ground_truth.expected_test_callers,
+            total_tests=total_tests,
+            latency_ms=total_pipeline_latency_ms + rag_latency_ms,
+            evolution_latency_ms=evolution_latency_ms,
+            selection_latency_ms=selection_latency_ms + rag_latency_ms,
+        )
+
         run = EvaluationRun(
             run_id=f"run_{case.case_id}_{int(time.time())}",
             case_id=case.case_id,
@@ -204,11 +220,13 @@ class EvaluationEngine:
                 BaselineType.FULL_REGRESSION.value: res_full,
                 BaselineType.NAIVE_NAME_MATCHING.value: res_naive,
                 BaselineType.TESTPILOT.value: res_testpilot,
+                BaselineType.TESTPILOT_RAG.value: res_testpilot_rag,
             },
             metrics={
                 BaselineType.FULL_REGRESSION.value: metrics_full,
                 BaselineType.NAIVE_NAME_MATCHING.value: metrics_naive,
                 BaselineType.TESTPILOT.value: metrics_testpilot,
+                BaselineType.TESTPILOT_RAG.value: metrics_testpilot_rag,
             },
             evidence_records=evidence_records,
             timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -354,6 +372,11 @@ class EvaluationEngine:
             "TestPilot (Qualified Identity)",
             "Qualified SymbolId + receiver resolution (7 TP, 0 FP; 5 FN due to Flask dynamic fixture)",
         )
+        testpilot_rag_row = compute_pooled_baseline(
+            "testpilot_rag",
+            "TestPilot + Repository RAG",
+            "TestPilot augmented with repository code vector retrieval and semantic validation",
+        )
 
         # Build Negative Control Case Study representation (Home Assistant Core)
         neg_cases = []
@@ -410,6 +433,7 @@ class EvaluationEngine:
                 "full_regression": full_reg_row,
                 "naive_name_matching": naive_row,
                 "testpilot": testpilot_row,
+                "testpilot_rag": testpilot_rag_row,
             },
             "negative_control_study": neg_cases[0] if neg_cases else None,
             "negative_control_cases": neg_cases,

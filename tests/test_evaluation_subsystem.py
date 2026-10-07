@@ -278,3 +278,23 @@ def test_overview_summary_pooled_mathematical_consistency():
     assert neg["recall"] is None
     assert neg["f1"] is None
 
+
+def test_testpilot_rag_baseline(monkeypatch):
+    """Verify TestPilot + Repository RAG baseline returns valid BaselineResult with recall preserved."""
+    monkeypatch.setenv("TESTPILOT_OFFLINE_MODE", "1")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        evaluator = BaselineEvaluator(repo_path=tmpdir)
+        sym = ChangedSymbol(
+            name="calculate_discount",
+            file_path="pricing.py",
+            line_start=1,
+            line_end=10,
+            change_type=ChangeType.MODIFIED,
+        )
+        all_tests = ["tests/test_pricing.py::test_calculate_discount"]
+        res, evidence = evaluator.run_testpilot_rag([sym], all_tests)
+
+        assert res.baseline_type == BaselineType.TESTPILOT_RAG
+        assert "TestPilot + Repository RAG" in res.name
+        assert res.selected_count >= 0
+

@@ -206,6 +206,10 @@ class PrioritizedTest(BaseModel):
     event_name: Optional[str] = Field(default=None, description="Associated event name if matched via event analysis")
     missing_evidence: list[str] = Field(default_factory=list, description="Missing evidence or uncertainty factors")
     structured_evidence: list[EvidenceItem] = Field(default_factory=list, description="Granular structured evidence entries")
+    semantic_decision: Optional[str] = Field(default=None, description="HIGH, MEDIUM, or LOW from semantic validation")
+    semantic_confidence: Optional[float] = Field(default=None, description="Confidence of semantic validation (0.0 to 1.0)")
+    semantic_reason: Optional[str] = Field(default=None, description="Semantic reasoning for behavioral relevance")
+    semantic_supporting_evidence: list[str] = Field(default_factory=list, description="Evidence points from CodeLlama/RAG")
 
     @model_validator(mode="after")
     def populate_defaults(self) -> "PrioritizedTest":
