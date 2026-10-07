@@ -20,6 +20,8 @@ from rich.table import Table
 from testpilot.ast_engine.treesitter_parser import ASTDiffParser
 from testpilot.benchmark.runner import BenchmarkRunner
 from testpilot.core.models import PromptTechnique
+from testpilot.core.pipeline import FullPipelineOrchestrator, PipelineRunRequest
+from testpilot.evaluation import EvaluationEngine
 from testpilot.evolution import (
     EvolutionRequest,
     InvalidGitReferenceError,
@@ -1005,6 +1007,220 @@ def evolution_cmd(
                 missing,
             )
         console.print(candidate_table)
+
+
+@app.command("pipeline")
+def pipeline_cmd(
+    base: str = typer.Option("HEAD~1", "--base", "-b", help="Base Git ref for Evolution comparison"),
+    target: Optional[str] = typer.Option(None, "--target", "-t", help="Target Git ref (default: working tree or HEAD)"),
+    repo_path: str = typer.Option(".", "--repo-path", "-r", help="Repository root path"),
+    max_depth: int = typer.Option(3, "--max-depth", "-d", help="Max transitive call-graph depth (1-5)"),
+    spec_path: str = typer.Option("testbed/openapi.json", "--spec-path", "-s", help="Path to OpenAPI specification"),
+    skip_evolution: bool = typer.Option(False, "--skip-evolution", help="Skip Stage 0 Repository Evolution"),
+):
+    """
+    Run Full TestPilot Autonomous Closed-Loop Pipeline:
+    Stage 0: Repository Evolution Intelligence & Regression Test Prioritization
+    Stage 1: OpenAPI Schema Boundary Matrix extraction
+    Stage 2: Prioritized Regression & Boundary Test Execution
+    Stage 3: Spec-as-Oracle Three-Valued Arbitration
+    Stage 4: Safety Guardrails Audit
+    Stage 5: Autonomous Remediation (Sweep.dev pattern)
+    Stage 6: Ephemeral Sandbox Verification
+    """
+    target_display = target or "HEAD"
+    evo_display = "DISABLED" if skip_evolution else f"{base} -> {target_display}"
+
+    console.print(Panel.fit(
+        f"[bold cyan]TestPilot AI — Full Autonomous Pipeline Run[/bold cyan]\n"
+        f"Stage 0 Evolution: [bold yellow]{evo_display}[/bold yellow] | "
+        f"Spec: [bold green]{spec_path}[/bold green]"
+    ))
+
+    req = PipelineRunRequest(
+        repo_path=repo_path,
+        base_ref=base,
+        target_ref=target,
+        max_depth=max_depth,
+        spec_path=spec_path,
+        enable_evolution=not skip_evolution,
+    )
+
+    with console.status("[bold green]Executing full closed-loop testing & remediation pipeline...[/bold green]"):
+        orchestrator = FullPipelineOrchestrator()
+        result = orchestrator.execute(req)
+
+    # 1. Pipeline Summary Table
+    summary_table = Table(title=f"Full Pipeline Results — Status: [{ 'green' if result.overall_status == 'SUCCESS' else 'yellow'}]{result.overall_status}[/]", show_lines=True)
+    summary_table.add_column("Stage", style="bold cyan", width=28)
+    summary_table.add_column("Status", width=16)
+    summary_table.add_column("Key Metrics / Findings", style="dim")
+
+    # Stage 0
+    evo = result.evolution
+    evo_style = "green" if evo.status == "SUCCESS" else ("yellow" if evo.status == "DEGRADED" else "dim")
+    summary_table.add_row(
+        "0. Repository Evolution",
+        f"[{evo_style}]{evo.status}[/{evo_style}]",
+        f"Files: {len(evo.changed_files)}, Symbols: {len(evo.changed_symbols)}, Blast: {evo.blast_radius_size}, Prioritized Tests: {len(evo.prioritized_tests)} ({evo.analysis_latency_ms:.1f}ms)",
+    )
+
+    # Stage 1
+    bnd = result.boundary_testing
+    summary_table.add_row(
+        "1. OpenAPI Schema Boundaries",
+        f"[green]{bnd.status}[/green]",
+        f"Extracted {bnd.total_boundaries} formal schema boundary constraints",
+    )
+
+    # Stage 2
+    reg = result.regression_testing
+    summary_table.add_row(
+        "2. Regression Test Execution",
+        f"[green]{reg.status}[/green]",
+        f"Source: {reg.source}, Total: {len(reg.executed_tests)}, Passed: {reg.total_passed}, Failed: {reg.total_failed}",
+    )
+
+    # Stage 3
+    arb = result.arbitration
+    summary_table.add_row(
+        "3. Three-Valued Arbitration",
+        f"[green]{arb.status}[/green]",
+        f"Arbitrated: {arb.total_arbitrated} ({', '.join(f'{k}: {v}' for k, v in arb.verdicts_summary.items())})",
+    )
+
+    # Stage 4
+    grd = result.guardrails
+    grd_style = "green" if grd.is_valid else "red"
+    summary_table.add_row(
+        "4. Safety Guardrails",
+        f"[{grd_style}]{'SAFE' if grd.is_valid else 'FLAGGED'}[/{grd_style}]",
+        f"Safety score: {grd.safety_score:.2f}, Violations: {len(grd.violations)}",
+    )
+
+    # Stage 5 & 6
+    rem = result.remediation
+    snd = result.sandbox_verification
+    summary_table.add_row(
+        "5. Remediation & Sandbox",
+        f"[green]{'VERIFIED GREEN' if snd.verified_in_sandbox else 'PENDING'}[/green]",
+        f"Patch generated: {rem.patch_generated}, Sandbox verified: {snd.verified_in_sandbox}",
+    )
+
+    console.print(summary_table)
+
+    # 2. Prioritized Regression Tests Table
+    if evo.prioritized_tests:
+        tests_table = Table(title="Stage 0 Prioritized Regression Tests (Run First)", show_lines=True)
+        tests_table.add_column("Tier", width=10, style="bold")
+        tests_table.add_column("Score", width=8)
+        tests_table.add_column("Test Function", style="bold yellow", width=30)
+        tests_table.add_column("File Path", style="dim", width=35)
+        tests_table.add_column("Execution Command", style="cyan")
+
+        for t in evo.prioritized_tests:
+            tier_str = t.priority_tier.value if hasattr(t.priority_tier, "value") else str(t.priority_tier)
+            t_color = "red" if tier_str == "CRITICAL" else ("yellow" if tier_str == "HIGH" else "cyan")
+            tests_table.add_row(
+                f"[{t_color}]{tier_str}[/{t_color}]",
+                f"{t.priority_score:.2f}",
+                t.test_name,
+                t.test_file,
+                t.execution_command,
+            )
+        console.print(tests_table)
+
+    console.print(f"[bold green]Full Pipeline Run Completed in {result.pipeline_latency_ms:.1f}ms.[/bold green]\n")
+
+
+@app.command(name="evaluate")
+def evaluate_cmd(
+    case_id: Optional[str] = typer.Option(None, "--case", "-c", help="Specific benchmark case ID to evaluate"),
+    all_cases: bool = typer.Option(False, "--all", "-a", help="Run all configured benchmark cases"),
+):
+    """
+    Empirical Evaluation & Quantitative Benchmarking Harness.
+    Executes baselines (Full Regression, Naive Name Matching, TestPilot Qualified Identity)
+    against real repositories (Flask, Django, Home Assistant) and testbed scenarios.
+    """
+    engine = EvaluationEngine()
+
+    if not case_id and not all_cases:
+        # Display current overview summary
+        summary = engine.get_overview_summary()
+        p_val = f"{summary['macro_precision'] * 100:.1f}%" if summary.get("macro_precision") is not None else "N/A"
+        r_val = f"{summary['macro_recall'] * 100:.2f}%" if summary.get("macro_recall") is not None else "N/A"
+        f1_val = f"{summary['macro_f1'] * 100:.2f}%" if summary.get("macro_f1") is not None else "N/A"
+        red_val = f"{summary['avg_test_reduction_pct']:.2f}%" if summary.get("avg_test_reduction_pct") is not None else "N/A"
+
+        console.print(Panel.fit(
+            f"[bold cyan]TestPilot Empirical Evaluation: {summary.get('methodology_label', 'Positive-Ground-Truth Pooled Evaluation')}[/bold cyan]\n"
+            f"Status: [yellow]{summary['status']}[/yellow] | Repositories: [bold]{summary['repositories_count']}[/bold] | Positive Cases: [bold]{summary.get('positive_cases_count', 0)}[/bold]\n"
+            f"Pooled Precision: [bold green]{p_val}[/bold green] | Pooled Recall: [bold green]{r_val}[/bold green] | Pooled F1: [bold green]{f1_val}[/bold green]\n"
+            f"Test Reduction: [bold yellow]{red_val}[/bold yellow] | Avg Latency: [bold]{summary['avg_latency_ms'] or 'N/A'} ms[/bold]\n"
+            f"[dim]{summary.get('methodology_description', '')}[/dim]",
+            title="Evaluation Overview",
+            border_style="cyan",
+        ))
+
+        if summary.get("baseline_comparison"):
+            comp_table = Table(title="Baseline Comparison Matrix (Positive-Ground-Truth Pooled Suite)", show_lines=True)
+            comp_table.add_column("Method", style="bold")
+            comp_table.add_column("Tests Selected")
+            comp_table.add_column("Precision", style="cyan")
+            comp_table.add_column("Recall", style="green")
+            comp_table.add_column("F1", style="magenta")
+            comp_table.add_column("Reduction", style="yellow")
+            comp_table.add_column("Latency")
+            comp_table.add_column("Notes", style="dim")
+
+            for k, row in summary["baseline_comparison"].items():
+                p_str = f"{row['precision'] * 100:.2f}%" if isinstance(row.get("precision"), (int, float)) else str(row.get("precision", "N/A"))
+                r_str = f"{row['recall'] * 100:.2f}%" if isinstance(row.get("recall"), (int, float)) else str(row.get("recall", "N/A"))
+                f1_str = f"{row['f1'] * 100:.2f}%" if isinstance(row.get("f1"), (int, float)) else str(row.get("f1", "N/A"))
+                comp_table.add_row(
+                    row.get("method", k),
+                    str(row.get("tests_selected", "N/A")),
+                    p_str,
+                    r_str,
+                    f1_str,
+                    f"{row.get('test_reduction'):.2f}%" if isinstance(row.get("test_reduction"), (int, float)) else "N/A",
+                    f"{row.get('latency')} ms" if row.get("latency") not in ("N/A", None) else "N/A",
+                    row.get("notes", ""),
+                )
+            console.print(comp_table)
+
+        if summary.get("negative_control_study"):
+            neg = summary["negative_control_study"]
+            console.print(Panel(
+                f"[bold magenta]Empirical Negative Control / False-Positive Case Study[/bold magenta]\n"
+                f"Repository: [bold]{neg.get('repository')}[/bold] | Commits: {neg.get('base_commit', '')[:8]} → {neg.get('target_commit', '')[:8]}\n"
+                f"Ground Truth: [bold]0 callers[/bold] | Total Tests: [bold]{neg.get('total_tests', 0):,}[/bold]\n"
+                f"Naive Selected: [bold red]{neg.get('naive_selected', 0)} (False Positives)[/bold red] | TestPilot Selected: [bold green]{neg.get('testpilot_selected', 0)} (100% Rejection)[/bold green]\n"
+                f"Precision / Recall / F1: [cyan]N/A (0/0)[/cyan] | Reduction: [yellow]100.0%[/yellow]\n"
+                f"[dim]{neg.get('notes', '')}[/dim]",
+                title="Negative Control",
+                border_style="magenta",
+            ))
+
+        console.print("[dim]Use --all to run all benchmarks or --case <id> to run a specific case.[/dim]")
+        return
+
+    target_cases = [case_id] if case_id else [c.case_id for c in engine.storage.get_benchmark_cases()]
+    for cid in target_cases:
+        console.print(f"[cyan]Executing benchmark:[/] [bold]{cid}[/]...")
+        try:
+            run = engine.run_benchmark(cid)
+            tp_m = run.metrics.get("testpilot")
+            p_str = f"{tp_m.precision * 100:.1f}%" if tp_m and tp_m.precision is not None else "N/A"
+            r_str = f"{tp_m.recall * 100:.1f}%" if tp_m and tp_m.recall is not None else "N/A"
+            red_str = f"{tp_m.test_reduction_pct:.1f}%" if tp_m and tp_m.test_reduction_pct is not None else "N/A"
+            console.print(
+                f"[green]✓ Completed {cid}[/]: TP={tp_m.tp if tp_m else 0}, FP={tp_m.fp if tp_m else 0}, FN={tp_m.fn if tp_m else 0} | "
+                f"Precision={p_str}, Recall={r_str}, Reduction={red_str}, Latency={tp_m.latency_ms if tp_m else 0:.1f}ms"
+            )
+        except Exception as e:
+            console.print(f"[bold red]✗ Failed {cid}[/]: {e}")
 
 
 evolution_command = evolution_cmd

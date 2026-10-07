@@ -6,6 +6,22 @@ Repository Evolution Intelligence analyzes code modifications across Git revisio
 
 The event-based impact analyzer addresses indirect couplings where code changes affect event handlers (e.g., listeners registered to framework signals like `post_migrate`, `post_save`, etc.) that are executed dynamically rather than called directly in source code.
 
+### Pipeline Integration (Stage 0 Pre-Analysis)
+**Repository Evolution Intelligence acts as a change-impact and regression-test-prioritization stage before specification-driven testing.**
+
+When running the full pipeline (`testpilot pipeline` CLI, `POST /api/pipeline/run`, or "Run Full Pipeline" in the Web UI):
+1. Evolution runs first as Stage 0 to extract changed Python AST symbols and map transitive callers.
+2. Identified regression tests are prioritized into `CRITICAL`, `HIGH`, and `MEDIUM` tiers and fed directly into the test execution stage.
+3. Tests impacting modified symbols are executed first, preventing the need to blindly run the entire repository test suite.
+4. Any regression test failures are piped directly into the 3-valued arbiter (`TRUE_CODE_DEFECT`, `INVALID_TEST_ASSERTION`, `SPEC_AMBIGUITY_OR_DEFECT`).
+5. **Graceful Degradation**: If repository analysis fails, git refs cannot resolve, or Sourcegraph is offline, Evolution gracefully marks its stage as `DEGRADED` and allows the pipeline to proceed without crashing.
+
+### Standalone Workflow Preservation
+The Evolution Intelligence engine remains fully operational as an independent workflow:
+- **CLI**: `testpilot evolution --repo-path <path> --base <base> --target <target>`
+- **API**: `POST /api/evolution/analyze`
+- **Web UI**: Dedicated "Repository Evolution Intelligence" tab (`tab-evolution`)
+
 ---
 
 ## 2. Event-Match Classifications

@@ -5,37 +5,56 @@
 
 ---
 
-## 1. System Overview
+## 1. System Overview & Research Positioning
 
-TestPilot AI is an autonomous, specification-grounded test generation and regression arbitration agent built for modern enterprise CI/CD workflows. It resolves the "Code-as-Oracle" failure mode of standard AI testing tools by anchoring all verification to formal specifications (OpenAPI 3.1 contracts, JSON Schemas, and Product Requirement Documents).
+**TestPilot — Evidence-Grounded AI for Change-Aware Regression Testing**
+
+TestPilot combines deterministic repository analysis with LLM-based reasoning to identify regression tests affected by code changes, generate specification-grounded boundary tests, and classify failures as code defects, invalid test assertions, or specification ambiguity.
+
+### Primary Research Questions
+- **Primary**: *"Can repository-aware AI-assisted impact analysis accurately identify regression tests affected by software changes while reducing unnecessary test execution?"*
+- **Secondary**: *"Does combining deterministic repository evidence with LLM-based semantic reasoning improve the reliability of regression-test selection and failure classification compared with simpler baselines?"*
+
+> [!IMPORTANT]
+> **Research Integrity Position**:
+> Autonomous code remediation is strictly classified as an **experimental extension / optional stage**, not the primary validated contribution.
+> The primary validated contributions are:
+> 1. Repository-aware regression-test impact analysis (Git, AST/Tree-sitter, qualified symbol identity, code intelligence)
+> 2. Specification-grounded boundary testing (OpenAPI formal boundaries)
+> 3. Three-valued failure arbitration (TRUE_CODE_DEFECT, INVALID_TEST_ASSERTION, SPEC_AMBIGUITY_OR_DEFECT)
+> 4. Quantitative empirical evaluation of these components against established baselines (Full Regression, Naive Name Matching).
+
+### Validated Research Architecture Pipeline
+
+The end-to-end execution flow connects deterministic repository intelligence directly to boundary testing and arbitration:
 
 ```
-+-----------------------------------------------------------------------------------+
-|                                  TESTPILOT AI                                     |
-+-----------------------------------------------------------------------------------+
-|  [Git Diff / PR]   [OpenAPI 3.1 Spec]   [PRD Requirements]                       |
-|         │                  │                    │                                 |
-|         ▼                  ▼                    ▼                                 |
-|  ┌─────────────┐    ┌─────────────┐      ┌─────────────┐                          |
-|  │ AST Parser  │    │ Spec Parser │      │ Sourcegraph │ (Downstream blast radius)|
-|  └──────┬──────┘    └──────┬──────┘      └──────┬──────┘                          |
-|         │                  │                    │                                 |
-|         └──────────┬───────┴────────────────────┘                                 |
-|                    ▼                                                              |
-|        ┌────────────────────────┐                                                 |
-|        │  Prompt Engine (CoT)   │ ◄── [Ollama Qwen2.5-Coder:7b]                   |
-|        └──────────┬─────────────┘                                                 |
-|                    ▼                                                              |
-|        ┌────────────────────────┐                                                 |
-|        │  Pytest Synthesizer    │ ◄── [Deterministic OpenAPI Boundary Matrices]   |
-|        └──────────┬─────────────┘                                                 |
-|                    ▼                                                              |
-|        ┌────────────────────────┐                                                 |
-|        │ Three-Valued Arbiter   │ ──► [TRUE_CODE_DEFECT]         ──► Auto Patch PR|
-|        │ (ChromaDB + Ollama)    │ ──► [INVALID_TEST_ASSERTION]   ──► Flag Debt    |
-|        └────────────────────────┘ ──► [SPEC_AMBIGUITY_OR_DEFECT] ──► Flag Spec    |
-+-----------------------------------------------------------------------------------+
+Git Code Change (Diff / Commits / PR)
+      ↓
+[Stage 0] Repository Evolution Intelligence
+(AST / Tree-sitter, Sourcegraph, Qualified Symbol Identity SymbolId)
+      ↓
+Changed Files & Symbols
+      ↓
+Affected Regression Tests (CRITICAL / HIGH / MEDIUM)
+      ↓
+[Stage 1] Specification & Boundary Analysis (OpenAPI 3.1 & PRD)
+      ↓
+[Stage 2] Boundary Test Synthesis & Pytest Execution
+      ↓
+[Stage 3] Three-Valued Failure Arbitration
+(TRUE_CODE_DEFECT / INVALID_TEST_ASSERTION / SPEC_AMBIGUITY_OR_DEFECT)
+      ↓
+[Stage 4] Experimental Remediation & Sandbox Verification (Optional Research Extension)
 ```
+
+### Graceful Degradation Protocol
+The pipeline enforces strict resilience and graceful degradation:
+1. **Repository Unavailable or Unresolved Git Refs**: If git refs cannot be resolved or repository path is missing/unsupported, Evolution is logged as a warning, marked with `status: "DEGRADED"`, and the pipeline proceeds directly to specification and boundary testing without crashing.
+2. **Sourcegraph Unavailable**: Seamlessly falls back to local AST and tree-sitter call-graph traversal. Sourcegraph is entirely optional.
+3. **Non-Python / Unsupported Changes**: Evolution logs a warning, returns 0 impacted symbols, and does not crash the pipeline.
+4. **Zero Impacted Tests**: When code changes produce no affected tests in the repository test suite, blast radius is accurately reported as `0` without fabricating fake tests, and the pipeline continues normally.
+5. **Arbitration Invariance**: Evolution intelligence influences *which* tests run first; it never overrides the 3-valued arbitration classifications.
 
 ---
 

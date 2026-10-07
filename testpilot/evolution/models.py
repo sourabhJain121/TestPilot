@@ -58,6 +58,34 @@ class EvolutionRequest(BaseModel):
     max_depth: int = Field(default=3, ge=1, le=5, description="Maximum call-graph traversal depth for indirect impacts")
 
 
+class SymbolId(BaseModel):
+    """Canonical representation of a Python symbol's qualified identity."""
+    file_path: str = Field(..., description="Repository-relative file path")
+    name: str = Field(..., description="Function or method name")
+    class_name: Optional[str] = Field(default=None, description="Enclosing class name if a method")
+
+    @classmethod
+    def get_module_path(cls, file_path: str) -> str:
+        p = file_path.replace("\\", "/").strip("./")
+        if p.endswith(".py"):
+            p = p[:-3]
+        if p.endswith("/__init__"):
+            p = p[:-9]
+        return p.replace("/", ".")
+
+    @property
+    def module_path(self) -> str:
+        return self.get_module_path(self.file_path)
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.class_name}.{self.name}" if self.class_name else self.name
+
+    @property
+    def canonical_id(self) -> str:
+        return f"{self.module_path}.{self.qualified_name}"
+
+
 class ChangedSymbol(BaseModel):
     name: str = Field(..., description="Function, method, or class name")
     class_name: Optional[str] = Field(default=None, description="Enclosing class name if a method")
@@ -71,7 +99,27 @@ class ChangedSymbol(BaseModel):
 
     @property
     def symbol_name(self) -> str:
-        return self.name
+        return self.qualified_name
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.class_name}.{self.name}" if self.class_name else self.name
+
+    @property
+    def module_path(self) -> str:
+        return SymbolId.get_module_path(self.file_path)
+
+    @property
+    def canonical_id(self) -> str:
+        return f"{self.module_path}.{self.qualified_name}"
+
+    @property
+    def symbol_id(self) -> str:
+        return self.canonical_id
+
+    @property
+    def is_constructor(self) -> bool:
+        return self.name == "__init__" and bool(self.class_name)
 
     @property
     def start_line(self) -> int:
@@ -176,6 +224,10 @@ class PrioritizedTest(BaseModel):
         if self.uncertainty_score is not None and (self.confidence == 0.9 or self.confidence is None):
             self.confidence = round(max(0.0, min(1.0, 1.0 - self.uncertainty_score)), 2)
         return self
+
+    @property
+    def file_path(self) -> str:
+        return self.test_file
 
     @property
     def priority(self) -> str:

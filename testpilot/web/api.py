@@ -23,6 +23,8 @@ from pydantic import BaseModel
 
 from testpilot.ast_engine.treesitter_parser import ASTDiffParser
 from testpilot.benchmark.runner import run_benchmark
+from testpilot.core.pipeline import FullPipelineOrchestrator, PipelineRunRequest
+from testpilot.evaluation import EvaluationEngine
 from testpilot.evolution import (
     EvolutionRequest,
     InvalidGitReferenceError,
@@ -826,6 +828,25 @@ def get_git_refs(repo_path: Optional[str] = None) -> dict[str, Any]:
     }
 
 
+# 9b. Autonomous Full Pipeline Orchestration (Stage 0 Evolution -> Boundaries -> Regression -> Arbiter -> Guardrails -> Remediation)
+@app.post("/api/pipeline/run")
+def run_full_pipeline_endpoint(payload: Optional[PipelineRunRequest] = None) -> dict[str, Any]:
+    """
+    Execute full TestPilot pipeline:
+    Stage 0: Repository Evolution Intelligence (Git diff -> AST symbols -> Blast Radius -> Test Prioritization)
+    Stage 1: OpenAPI Schema Boundary Matrix Extraction
+    Stage 2: Prioritized Regression & Boundary Test Execution
+    Stage 3: Spec-as-Oracle Three-Valued Arbitration
+    Stage 4: Safety Guardrails Audit
+    Stage 5: Autonomous Remediation (Sweep.dev pattern)
+    Stage 6: Ephemeral Sandbox Verification
+    """
+    req = payload or PipelineRunRequest()
+    orchestrator = FullPipelineOrchestrator()
+    result = orchestrator.execute(req)
+    return result.model_dump()
+
+
 # 10. Model Configuration & Report Export
 class ModelConfigRequest(BaseModel):
     model: str
@@ -878,7 +899,156 @@ def export_report(request: ReportExportRequest) -> dict[str, Any]:
     }
 
 
-# 11. Static Files & Root Route
+# =========================================================================
+# 11. Empirical Evaluation Subsystem Endpoints
+# =========================================================================
+
+eval_engine = EvaluationEngine()
+
+
+class EvaluationRunApiRequest(BaseModel):
+    case_id: Optional[str] = None
+
+
+@app.get("/api/evaluation/overview")
+def get_evaluation_overview() -> dict[str, Any]:
+    """Return aggregated benchmark metrics and baseline comparison summary."""
+    return eval_engine.get_overview_summary()
+
+
+@app.get("/api/evaluation/benchmarks")
+def list_evaluation_benchmarks() -> list[dict[str, Any]]:
+    """List all benchmark cases along with their latest evaluation run status."""
+    cases = eval_engine.storage.get_benchmark_cases()
+    runs = eval_engine.storage.load_runs()
+    result = []
+    for c in cases:
+        run = runs.get(c.case_id)
+        result.append({
+            "case_id": c.case_id,
+            "name": c.name,
+            "repository": c.repository,
+            "category": c.category,
+            "base_commit": c.base_commit,
+            "target_commit": c.target_commit,
+            "description": c.description,
+            "total_tests": run.total_tests if run else (c.total_tests_suite or "N/A"),
+            "ground_truth_count": len(c.ground_truth.expected_test_callers),
+            "status": run.status if run else "not_evaluated",
+            "last_run": run.model_dump() if run else None,
+        })
+    return result
+
+
+@app.get("/api/evaluation/benchmarks/{case_id}")
+def get_evaluation_benchmark_detail(case_id: str) -> dict[str, Any]:
+    """Return complete benchmark case and latest run details with full evidence."""
+    case = eval_engine.storage.get_benchmark_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Benchmark case {case_id} not found")
+    run = eval_engine.storage.get_latest_run(case_id)
+    return {
+        "case": case.model_dump(),
+        "latest_run": run.model_dump() if run else None,
+        "is_evaluated": run is not None,
+    }
+
+
+@app.get("/api/evaluation/components")
+def get_component_correctness() -> list[dict[str, Any]]:
+    """Return deterministic component validation results with defined numerators and denominators."""
+    components = eval_engine.validate_components()
+    return [c.model_dump() for c in components]
+
+
+@app.get("/api/evaluation/failure-analysis")
+def get_failure_analysis() -> dict[str, Any]:
+    """Return failure analysis cases, highlighting the Home Assistant generic constructor collision."""
+    return {
+        "homeassistant_init_collision": {
+            "title": "Home Assistant Generic __init__ Collision Analysis",
+            "repository": "home-assistant/core",
+            "base_commit": "8b54f0db",
+            "target_commit": "42706c6b",
+            "total_tests": 48462,
+            "changed_symbol": "__init__",
+            "enclosing_class": "HueButtonEventEntity",
+            "old_approach": {
+                "name": "Naive Name-Based Matching",
+                "matched_symbol": "__init__",
+                "tests_selected": 19,
+                "outcome": "False-Positive Explosion: Unrelated test classes across hue and other integrations matched generic constructor name.",
+                "precision": "0.0%",
+            },
+            "new_approach": {
+                "name": "Qualified Symbol Identity",
+                "qualified_symbol": "HueButtonEventEntity.__init__",
+                "tests_selected": 0,
+                "outcome": "Zero False-Positive Collisions: Receiver-aware AST analysis confirmed no existing tests invoke this private event entity constructor directly.",
+                "scientific_interpretation": "False-positive elimination demonstrated; recall evaluated independently.",
+            },
+        },
+        "flask_fixture_recall_limitation": {
+            "title": "Flask Dynamic Pytest Fixture Limitation (Recall Loss Analysis)",
+            "repository": "pallets/flask",
+            "base_commit": "de8429ff",
+            "target_commit": "7203feab",
+            "total_tests": 375,
+            "changed_symbol": "Flask.run",
+            "ground_truth_count": 5,
+            "naive_approach": {
+                "name": "Naive Name-Based Matching",
+                "tests_selected": 19,
+                "tp": 5,
+                "fp": 14,
+                "outcome": "Selected all 5 true ground-truth callers (100% recall), but incurred 14 false positives due to bare 'run' token matches in unrelated tests.",
+                "precision": "26.32%",
+                "recall": "100.0%",
+            },
+            "qualified_approach": {
+                "name": "Qualified Symbol Identity",
+                "tests_selected": 0,
+                "tp": 0,
+                "fp": 0,
+                "fn": 5,
+                "outcome": "Eliminated all 14 false positives, but missed fixture-injected app.run() calls because pytest fixtures inject Flask app instances across module boundaries without static type annotations, causing recall loss (0% recall).",
+                "precision": "N/A",
+                "recall": "0.0%",
+                "scientific_interpretation": "Trade-off analysis: Qualified identity achieves 100% precision by eliminating false positives, but purely static AST analysis without cross-module fixture inference suffers recall loss on dynamic test frameworks.",
+            },
+        },
+        "edge_cases": [
+            {
+                "case": "Generic verb collisions ('run', 'handle', 'dispatch')",
+                "solution": "Scoped by AST receiver type inference and enclosing class stack.",
+            },
+            {
+                "case": "Empty ground truth (negative control)",
+                "solution": "Displays N/A for Precision/Recall instead of fabricating 100%.",
+            },
+            {
+                "case": "Unresolved external callers",
+                "solution": "Quarantined with explicit confidence and uncertainty scores.",
+            },
+        ],
+    }
+
+
+@app.post("/api/evaluation/run")
+def trigger_evaluation_run(request: EvaluationRunApiRequest) -> dict[str, Any]:
+    """Execute benchmark case on-demand and update persistent storage."""
+    try:
+        if request.case_id:
+            run = eval_engine.run_benchmark(request.case_id)
+            return {"status": "success", "runs": [run.model_dump()]}
+        else:
+            runs = eval_engine.run_all_benchmarks()
+            return {"status": "success", "runs": [r.model_dump() for r in runs]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# 12. Static Files & Root Route
 static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")

@@ -1,4 +1,6 @@
-# 🚀 TestPilot AI: Autonomous Spec-as-Oracle & Repository Evolution Intelligence Agent
+# 🚀 TestPilot — Evidence-Grounded AI for Change-Aware Regression Testing
+
+### Repository Evolution &rarr; Specification-Grounded Testing &rarr; Three-Valued Failure Arbitration
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com)
@@ -7,17 +9,36 @@
 [![Local LLM](https://img.shields.io/badge/Local_LLM-Ollama_CodeLlama_&_Qwen-orange.svg)](https://ollama.ai)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **TestPilot AI** is an enterprise-grade autonomous testing, regression prioritization, and closed-loop code remediation agent. It reframes software testing by using formal specifications (OpenAPI 3.1 & PRDs) as the ground-truth oracle, combined with AST-level repository evolution intelligence to automatically analyze Git diffs, map transitive blast radiuses, prioritize affected tests, and generate self-healing patches.
+> **TestPilot** combines deterministic repository analysis with LLM-based reasoning to identify regression tests affected by code changes, generate specification-grounded boundary tests, and classify failures as code defects, invalid test assertions, or specification ambiguity.
+
+### Research Questions
+- **Primary**: *"Can repository-aware AI-assisted impact analysis accurately identify regression tests affected by software changes while reducing unnecessary test execution?"*
+- **Secondary**: *"Does combining deterministic repository evidence with LLM-based semantic reasoning improve the reliability of regression-test selection and failure classification compared with simpler baselines?"*
+
+> [!IMPORTANT]
+> **Research Positioning**: Autonomous code remediation is an **experimental extension / optional stage**, not the primary validated contribution.
+> The primary validated contributions are:
+> 1. **Repository-Aware Regression-Test Impact Analysis** (using Git, AST/Tree-sitter, qualified symbol identity, and repository code intelligence).
+> 2. **Specification-Grounded Testing** (deterministic OpenAPI boundary extraction coupled with repository context).
+> 3. **Three-Valued Failure Arbitration** (`TRUE_CODE_DEFECT`, `INVALID_TEST_ASSERTION`, `SPEC_AMBIGUITY_OR_DEFECT`).
+> 4. **Quantitative Evaluation** against established baselines (Full Regression, Naive Name Matching) across real-world repositories (Flask, Django, Home Assistant).
 
 ---
 
-## 🌟 Key Features
+## 🌟 Key Research Contributions
 
-1. **Spec-as-Oracle Triaging (Three-Valued Logic)**:
-   - Rather than binary pass/fail, TestPilot classifies test failures into three distinct categories using semantic retrieval over OpenAPI 3.1 & PRDs:
-     - `TRUE_CODE_DEFECT`: The implementation violates an explicit spec contract $\rightarrow$ triggers autonomous remediation.
-     - `INVALID_TEST_ASSERTION`: The test hallucinated behavior or asserted ungrounded expectations contradictory to the contract $\rightarrow$ pruned to prevent test debt.
-     - `SPEC_AMBIGUITY_OR_DEFECT`: The contract is underspecified or contradictory $\rightarrow$ flagged for product review.
+1. **Repository-Aware Regression Analysis**:
+   - Identifies changed symbols and affected regression tests using Git diffs, AST/Tree-sitter, qualified symbol identity (`SymbolId`), and caller graph traversals.
+   - Eliminates generic-token collisions (e.g. constructor `__init__` in Home Assistant) via class and receiver-scoped resolution.
+
+2. **Specification-Grounded Testing**:
+   - Extracts deterministic schema boundaries from OpenAPI specifications (e.g. exclusive minimums, enum sets) without stochastic hallucination.
+
+3. **Three-Valued Failure Arbitration**:
+   - Classifies failures into `TRUE_CODE_DEFECT`, `INVALID_TEST_ASSERTION`, or `SPEC_AMBIGUITY_OR_DEFECT` using code, test, and specification evidence.
+
+4. **In-App Empirical Evaluation Subsystem**:
+   - Traceable, quantitative benchmarking measuring Precision, Recall, F1-Score, Test Reduction %, and Latency against Full Regression and Naive Name Matching baselines.
 
 2. **Repository Evolution Intelligence & Remote Git Testing**:
    - **Direct Git URL Support**: Input any remote Git repository link (e.g., `https://github.com/pallets/flask.git`, `https://github.com/django/django.git`) or local directory. TestPilot shallow-clones (`--depth 50`) into `~/.testpilot_repos/` and analyzes it immediately.
@@ -48,45 +69,62 @@
 
 ## 🏗️ System Architecture
 
+**Repository Evolution Intelligence acts as a change-impact and regression-test-prioritization stage before specification-driven testing.**
+
+The TestPilot pipeline integrates Git code intelligence directly into specification testing and autonomous remediation:
+
 ```
-                    ┌──────────────────────────────────────────────┐
-                    │      Target Git Repository / PR Diff         │
-                    │   (Local Path or Remote Clone via URL)       │
-                    └──────────────────────┬───────────────────────┘
-                                           │
-                    ┌──────────────────────▼───────────────────────┐
-                    │   AST Engine & Symbol Change Extraction      │
-                    │      (Tree-sitter Python Syntax Parser)      │
-                    └──────────────────────┬───────────────────────┘
-                                           │
-         ┌─────────────────────────────────┴─────────────────────────────────┐
-         ▼                                                                   ▼
-┌───────────────────────────────┐                   ┌────────────────────────────────┐
-│   Transitive Blast Radius     │                   │  Deterministic Boundary Engine │
-│ Local AST / Sourcegraph Graph │                   │ Extrema, Enums, Nulls, Off-by-1│
-└──────────────┬────────────────┘                   └────────────────┬───────────────┘
-               │                                                     │
-               ▼                                                     ▼
-┌───────────────────────────────┐                   ┌────────────────────────────────┐
-│ Test Prioritization Engine   │                   │ Chain-of-Thought LLM Synthesis │
-│ (Uncertainty Scoring & Tiers) │                   │  (CodeLlama:7b / Qwen2.5-Coder)│
-└──────────────┬────────────────┘                   └────────────────┬───────────────┘
-               │                                                     │
-               └───────────────────────┬─────────────────────────────┘
-                                       │
-                    ┌──────────────────▼───────────────────┐
-                    │  Spec-as-Oracle Triaging Arbiter     │
-                    │ (Three-Valued Logic Semantic RAG)    │
-                    └──────────────────┬───────────────────┘
-                                       │
-     ┌─────────────────────────────────┼─────────────────────────────────┐
-     ▼                                 ▼                                 ▼
-┌─────────────────────────┐   ┌───────────────────────────┐   ┌───────────────────────────┐
-│ INVALID_TEST_ASSERTION  │   │     TRUE_CODE_DEFECT      │   │ SPEC_AMBIGUITY_OR_DEFECT  │
-│ Prune hallucinated test │   │ Autonomous Sandbox Repair │   │ Flag spec inconsistency   │
-│ from test suite         │   │ (Sweep.dev Patch PR)      │   │ for engineer review       │
-└─────────────────────────┘   └───────────────────────────┘   └───────────────────────────┘
+Git Change (Diff / Commits / PR)
+    │
+    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ [Stage 0] Repository Evolution Intelligence                            │
+│  - Changed Python AST Symbols (Functions, Classes, Methods)            │
+│  - Transitive Blast Radius (Sourcegraph GraphQL / Local AST Fallback)  │
+│  - Prioritized Regression Tests (CRITICAL, HIGH, MEDIUM Tiers)         │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+    ┌───────────────────────────────┴───────────────────────────────┐
+    ▼                                                               ▼
+┌─────────────────────────────────┐   ┌──────────────────────────────────┐
+│ Prioritized Regression Execution│   │ [Stage 1] Deterministic Boundary │
+│ (Targeted Impacted Tests First) │   │ Extraction (OpenAPI 3.1 & PRD)   │
+└────────────────┬────────────────┘   └─────────────────┬────────────────┘
+                 │                                      │
+                 └──────────────────┬───────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ [Stage 2] Test Synthesis & Execution (Pytest Sandbox)                  │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ [Stage 3] Spec-as-Oracle Triaging Arbiter (Three-Valued Logic)         │
+│  - TRUE_CODE_DEFECT: Spec contract violated by code                    │
+│  - INVALID_TEST_ASSERTION: Test hallucinated ungrounded assertion     │
+│  - SPEC_AMBIGUITY_OR_DEFECT: Specification underspecified / flawed     │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ [Stage 4] Safety Guardrails & AST Quarantine                           │
+│  - Prompt Injection Defense, Syscall Blocker, Hallucination Gate       │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ [Stage 5] Autonomous Remediation & Sandbox Verification                │
+│  - Unified Diff Generation & Isolated Pytest Sandbox Patch Validation  │
+└────────────────────────────────────────────────────────────────────────┘
 ```
+
+### 🛡️ Graceful Degradation
+If Git refs cannot be resolved, the repository path is missing/unsupported, or Sourcegraph is offline:
+- Evolution analysis gracefully marks its status as `DEGRADED` with a clear warning.
+- The pipeline proceeds directly to specification and boundary testing without crashing.
+- Sourcegraph falls back automatically to local AST call-graph indexing.
+- Zero impacted tests are reported cleanly without fabricating fake blast radius.
 
 ---
 
@@ -152,7 +190,16 @@ Once launched, open your web browser at:
 
 ### Option B: CLI Commands
 
-#### 1. Test Any Git Repository (Local or Remote)
+#### 1. Run Full End-to-End Pipeline (Integrated Evolution + Boundaries + Arbiter + Remediation)
+```bash
+# Execute the full 6-stage pipeline on the local repo or cloned repository:
+testpilot pipeline --repo-path . --base HEAD~1 --target HEAD
+
+# Or execute with custom Git refs:
+testpilot pipeline --repo-path ~/.testpilot_repos/core --base HEAD~1 --target HEAD
+```
+
+#### 2. Standalone Repository Evolution Intelligence
 ```bash
 # Analyze changes between two commits in the current repo:
 testpilot evolution analyze --base HEAD~1 --target HEAD --repo-path .
@@ -203,15 +250,13 @@ The TestPilot web interface (`http://127.0.0.1:8501`) provides 9 integrated modu
 
 TestPilot generates clean, publication-ready reports in both Markdown and JSON:
 
-1. **Top Header Button (`Download Report`)**:
-   - Instantly downloads the complete Spec-as-Oracle Pipeline Report including arbitration breakdown and sandboxed remediation patches.
-2. **Evolution Tab Button (`Download Report`)**:
+1. **Evolution Tab Button (`Download Report`)**:
    - Instantly exports the Repository Evolution Intelligence Report with changed AST symbols, transitive call paths, uncertainty scores, and executable regression test commands.
-3. **Blast Radius Tab Button (`Download Blast Report`)**:
+2. **Blast Radius Tab Button (`Download Blast Report`)**:
    - Instantly exports the Transitive Blast Radius Report with target symbol callers, upstream hierarchy tables, risk scoring, and targeted test command strings (`pytest -k "..."`).
-4. **Zero-Clone Suite Download (`Download .py Suite`)**:
+3. **Zero-Clone Suite Download (`Download .py Suite`)**:
    - Instantly exports the synthesized Python boundary test suite generated directly from the public GitHub repository without disk cloning.
-5. **Persisted Disk Storage**:
+4. **Persisted Disk Storage**:
    - All exported reports are automatically archived under the `reports/` directory with UTC timestamps.
 
 ---

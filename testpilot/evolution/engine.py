@@ -27,7 +27,7 @@ from testpilot.evolution.models import (
     PrioritizedTest,
     PriorityTier,
 )
-from testpilot.sourcegraph.client import SourcegraphClient
+from testpilot.sourcegraph.client import LocalCodeGraphFallback, SourcegraphClient
 
 
 class InvalidGitReferenceError(ValueError):
@@ -148,7 +148,7 @@ class RepositoryEvolutionEngine:
             stat_args = ["git", "diff", "--stat", "-M", b_ref]
             status_args = ["git", "diff", "--name-status", "-M", b_ref]
         else:
-            diff_range = f"{b_ref}..{t_ref}" if b_ref != t_ref else b_ref
+            diff_range = f"{b_ref}..{t_ref}"
             diff_args = ["git", "diff", "--unified=3", "-M", diff_range]
             stat_args = ["git", "diff", "--stat", "-M", diff_range]
             status_args = ["git", "diff", "--name-status", "-M", diff_range]
@@ -211,6 +211,22 @@ class RepositoryEvolutionEngine:
         self.last_file_statuses = file_statuses
 
         return diff_text, changed_files, diff_stat
+
+    def analyze_diff(
+        self,
+        base_ref: str = "main",
+        target_ref: Optional[str] = "HEAD",
+    ) -> list[ChangedSymbol]:
+        """Convenience method to resolve git diff and extract changed symbols."""
+        diff_text, changed_files, _ = self.resolve_git_diff(base_ref=base_ref, target_ref=target_ref)
+        return self.extract_changed_symbols(
+            diff_text=diff_text,
+            changed_files=changed_files,
+            base_ref=base_ref,
+            target_ref=target_ref,
+            renamed_files=self.last_renamed_files,
+            file_statuses=self.last_file_statuses,
+        )
 
     def extract_changed_symbols(
         self,
@@ -289,7 +305,7 @@ class RepositoryEvolutionEngine:
                     try:
                         base_funcs = ASTDiffParser.parse_source(base_source, file_path=file_path)
                         for f in base_funcs:
-                            key = f"{file_path}:{f.name}"
+                            key = f"{file_path}:{f.class_name}.{f.name}" if f.class_name else f"{file_path}:{f.name}"
                             if key not in seen_keys:
                                 seen_keys.add(key)
                                 symbols.append(
@@ -314,7 +330,7 @@ class RepositoryEvolutionEngine:
                     try:
                         target_funcs = ASTDiffParser.parse_source(target_source, file_path=file_path)
                         for f in target_funcs:
-                            key = f"{file_path}:{f.name}"
+                            key = f"{file_path}:{f.class_name}.{f.name}" if f.class_name else f"{file_path}:{f.name}"
                             if key not in seen_keys:
                                 seen_keys.add(key)
                                 symbols.append(
@@ -349,7 +365,7 @@ class RepositoryEvolutionEngine:
 
                     # Find Added and Modified symbols
                     for (c_name, s_name), tf in target_funcs.items():
-                        key = f"{file_path}:{s_name}"
+                        key = f"{file_path}:{c_name}.{s_name}" if c_name else f"{file_path}:{s_name}"
                         if (c_name, s_name) not in base_funcs:
                             # Symbol is newly introduced in target
                             if key not in seen_keys:
@@ -395,7 +411,7 @@ class RepositoryEvolutionEngine:
 
                     # Find Deleted symbols (present in base but missing in target)
                     for (c_name, s_name), bf in base_funcs.items():
-                        key = f"{file_path}:{s_name}"
+                        key = f"{file_path}:{c_name}.{s_name}" if c_name else f"{file_path}:{s_name}"
                         if (c_name, s_name) not in target_funcs:
                             if key not in seen_keys:
                                 seen_keys.add(key)
@@ -425,7 +441,7 @@ class RepositoryEvolutionEngine:
                         rel_file = str(Path(f.file_path).resolve().relative_to(self.repo_root.resolve()))
                     except Exception:
                         pass
-                    key = f"{rel_file}:{f.name}"
+                    key = f"{rel_file}:{f.class_name}.{f.name}" if f.class_name else f"{rel_file}:{f.name}"
                     if key not in seen_keys:
                         seen_keys.add(key)
                         symbols.append(
@@ -457,16 +473,16 @@ class RepositoryEvolutionEngine:
         direct_impacts: list[ImpactNode] = []
         indirect_impacts: list[ImpactNode] = []
 
-        visited_nodes: set[tuple[str, str]] = set()  # (symbol_name, file_path)
-        # Queue stores: (current_symbol_name, current_file, current_depth, root_symbol_name, root_symbol_file, call_chain)
-        queue: list[tuple[str, str, int, str, str, list[str]]] = []
+        visited_nodes: set[tuple[str, str]] = set()  # (symbol_qualified_name, file_path)
+        # Queue stores: (current_symbol_name, current_file, current_class_name, current_depth, root_symbol_name, root_symbol_file, call_chain)
+        queue: list[tuple[str, str, Optional[str], int, str, str, list[str]]] = []
 
         for cs in changed_symbols:
             # Skip test files from being considered root symbols for production caller graph
             if any(t_dir in cs.file_path for t_dir in ("tests/", "test_", "/tests", "_test.py")):
                 continue
-            visited_nodes.add((cs.name, cs.file_path))
-            queue.append((cs.name, cs.file_path, 1, cs.name, cs.file_path, [cs.name]))
+            visited_nodes.add((cs.qualified_name, cs.file_path))
+            queue.append((cs.name, cs.file_path, cs.class_name, 1, cs.qualified_name, cs.file_path, [cs.qualified_name]))
 
             # Discover static event registrations for changed symbol
             regs = self.event_detector.find_registrations_for_handler(cs.name)
@@ -490,16 +506,16 @@ class RepositoryEvolutionEngine:
                     line_number=reg.line_number,
                     depth=1,
                     impact_type=ImpactType.EVENT_REGISTRATION,
-                    root_changed_symbol=cs.name,
+                    root_changed_symbol=cs.qualified_name,
                     root_changed_file=cs.file_path,
                     evidence=EvidenceTrail(
-                        call_chain=[cs.name, f"event:{reg.event_name}"],
+                        call_chain=[cs.qualified_name, f"event:{reg.event_name}"],
                         caller_file=reg.source_file,
                         line_number=reg.line_number,
                         resolution_engine="event_registration_detector",
                         match_quality=match_quality,
                         evidence_source=f"Event Registration ({reg.registration_type})",
-                        call_path_description=f"'{cs.name}' registered to '{reg.event_name}' via {reg.registration_expr}",
+                        call_path_description=f"'{cs.qualified_name}' registered to '{reg.event_name}' via {reg.registration_expr}",
                         is_ambiguous=not reg.is_confirmed,
                     ),
                     uncertainty_score=reg.uncertainty_score,
@@ -507,26 +523,27 @@ class RepositoryEvolutionEngine:
                     uncertainty_reason=unc_reason,
                     is_confirmed=reg.is_confirmed,
                     limitations=lims,
-                    reason=f"Event registration: '{cs.name}' is registered to listen to event '{reg.event_name}' in {reg.source_file}:{reg.line_number}",
+                    reason=f"Event registration: '{cs.qualified_name}' is registered to listen to event '{reg.event_name}' in {reg.source_file}:{reg.line_number}",
                 )
                 direct_impacts.append(event_node)
 
                 # Also enqueue event name to discover callers/triggers of the event
                 if max_depth >= 2:
-                    queue.append((reg.event_name, reg.source_file, 2, cs.name, cs.file_path, [cs.name, f"event:{reg.event_name}"]))
+                    queue.append((reg.event_name, reg.source_file, None, 2, cs.qualified_name, cs.file_path, [cs.qualified_name, f"event:{reg.event_name}"]))
 
         while queue:
-            curr_sym, curr_file, depth, root_sym, root_file, chain = queue.pop(0)
+            curr_sym, curr_file, curr_class, depth, root_sym, root_file, chain = queue.pop(0)
             if depth > max_depth:
                 continue
 
-            # Query callers through Sourcegraph / AST client
-            raw_callers = self.sg_client.get_function_callers(curr_sym, curr_file)
+            # Query callers through Sourcegraph / AST client with class context
+            raw_callers = self.sg_client.get_function_callers(curr_sym, curr_file, class_name=curr_class)
 
             for caller in raw_callers:
                 c_name = caller.get("caller_name", "<module>")
                 c_file = caller.get("file_path", "")
                 c_line = caller.get("line_number")
+                c_class = caller.get("class_name")
                 engine_type = caller.get("source_type", "local_ast_fallback")
                 is_ambiguous = caller.get("is_ambiguous", False)
                 match_quality = caller.get(
@@ -612,17 +629,18 @@ class RepositoryEvolutionEngine:
 
                 # Enqueue for next hop if depth < max_depth
                 if depth < max_depth and c_name != "<module>":
-                    queue.append((c_name, c_file, depth + 1, root_sym, root_file, new_chain))
+                    queue.append((c_name, c_file, c_class, depth + 1, root_sym, root_file, new_chain))
 
         return direct_impacts, indirect_impacts
 
     GENERIC_VERBS = {
+        "__init__", "setUp", "tearDown", "setUpClass", "tearDownClass", "setUpTestData",
+        "setup_method", "teardown_method", "setup_class", "teardown_class",
         "get", "post", "put", "delete", "patch", "options", "head",
-        "save", "load", "close", "open", "read", "write", "run", "start", "stop",
+        "save", "load", "close", "open", "read", "write", "run", "start", "stop", "reset", "clear",
         "update", "create", "filter", "all", "exists", "count",
-        "setUp", "tearDown", "setUpClass", "tearDownClass", "setUpTestData",
         "assertTrue", "assertFalse", "assertEqual", "assertNotEqual", "assertRaises", "assertIn",
-        "render", "dispatch", "execute", "validate", "status", "send", "connect",
+        "render", "dispatch", "execute", "validate", "status", "send", "connect", "handle", "process",
     }
     NON_TEST_METHODS = {
         "setUp", "tearDown", "setUpClass", "tearDownClass", "setUpTestData",
@@ -1006,11 +1024,11 @@ class RepositoryEvolutionEngine:
         cls,
         s_name: str,
         changed_sym_map: dict[str, ChangedSymbol],
-        imported_symbols: dict[str, str],
+        imported_symbols: Any,
         qualified_receivers: set[str],
     ) -> bool:
         """Guards against false positives from generic verbs and assertions."""
-        if s_name not in cls.GENERIC_VERBS:
+        if s_name not in cls.GENERIC_VERBS and s_name not in LocalCodeGraphFallback.GENERIC_METHOD_NAMES:
             return True
         cs = changed_sym_map.get(s_name)
         if not cs:
@@ -1024,6 +1042,341 @@ class RepositoryEvolutionEngine:
             return True
         return False
 
+    @classmethod
+    def _extract_local_var_types(cls, node: ast.AST) -> dict[str, str]:
+        """
+        Extracts local variable to class name bindings from assignments in an AST block.
+        E.g.: entity = HueButtonEventEntity(...) -> var_types['entity'] = 'HueButtonEventEntity'
+        """
+        var_types: dict[str, str] = {}
+        for child in ast.walk(node):
+            if isinstance(child, ast.Assign):
+                target_names = []
+                for t in child.targets:
+                    if isinstance(t, ast.Name):
+                        target_names.append(t.id)
+                if target_names and isinstance(child.value, ast.Call):
+                    if isinstance(child.value.func, ast.Name):
+                        cls_name = child.value.func.id
+                        for t_name in target_names:
+                            var_types[t_name] = cls_name
+                    elif isinstance(child.value.func, ast.Attribute):
+                        cls_name = child.value.func.attr
+                        for t_name in target_names:
+                            var_types[t_name] = cls_name
+            elif isinstance(child, ast.AnnAssign):
+                if isinstance(child.target, ast.Name) and isinstance(child.value, ast.Call):
+                    if isinstance(child.value.func, ast.Name):
+                        var_types[child.target.id] = child.value.func.id
+                    elif isinstance(child.value.func, ast.Attribute):
+                        var_types[child.target.id] = child.value.func.attr
+        return var_types
+
+    @classmethod
+    def _evaluate_call_match(
+        cls,
+        call_node: ast.Call,
+        cs: ChangedSymbol,
+        imported_symbols: dict[str, dict[str, str]],
+        rel_test_path: str,
+        enclosing_class: Optional[str] = None,
+        local_var_types: Optional[dict[str, str]] = None,
+    ) -> Optional[tuple[str, str, float, float, bool]]:
+        """
+        Evaluates whether an AST Call matches the qualified identity of ChangedSymbol.
+        Returns: (match_quality, description, confidence, uncertainty_score, is_ambiguous) or None.
+        """
+        var_types = local_var_types or {}
+        norm_target_file = cs.file_path.replace("\\", "/").lstrip("./")
+        norm_test_file = rel_test_path.replace("\\", "/").lstrip("./")
+        is_same_file = bool(norm_target_file and (norm_test_file == norm_target_file or norm_test_file.endswith(norm_target_file)))
+
+        # Case A: Constructor matching (cs.is_constructor, i.e. __init__ with class_name)
+        if cs.is_constructor:
+            target_class = cs.class_name
+            # 1. Direct instantiation: TargetClass(...)
+            if isinstance(call_node.func, ast.Name):
+                called_id = call_node.func.id
+                if called_id == target_class:
+                    if called_id in imported_symbols:
+                        mod = imported_symbols[called_id]["source_module"]
+                        if LocalCodeGraphFallback._module_matches_path(mod, cs.file_path):
+                            return (
+                                "CONFIRMED_CONSTRUCTOR_CALL",
+                                f"Directly instantiates changed class '{target_class}' ({cs.file_path})",
+                                0.95,
+                                0.05,
+                                False,
+                            )
+                        else:
+                            return None
+                    elif is_same_file or LocalCodeGraphFallback._module_matches_path(norm_test_file, cs.file_path):
+                        return (
+                            "CONFIRMED_CONSTRUCTOR_CALL",
+                            f"Instantiates changed class '{target_class}' in same module/file ({cs.file_path})",
+                            0.95,
+                            0.05,
+                            False,
+                        )
+                    else:
+                        # Bare class name in unimported, unrelated test
+                        return None
+                elif called_id in imported_symbols and imported_symbols[called_id].get("original_symbol") == target_class:
+                    mod = imported_symbols[called_id]["source_module"]
+                    if LocalCodeGraphFallback._module_matches_path(mod, cs.file_path):
+                        return (
+                            "CONFIRMED_CONSTRUCTOR_CALL",
+                            f"Instantiates changed class '{target_class}' via alias '{called_id}' ({cs.file_path})",
+                            0.95,
+                            0.05,
+                            False,
+                        )
+
+            # 2. Attribute instantiation or explicit method: module.TargetClass(...) or Class.__init__(...)
+            elif isinstance(call_node.func, ast.Attribute):
+                attr_name = call_node.func.attr
+                # 2a. module.TargetClass(...)
+                if attr_name == target_class:
+                    rec_expr = EventRegistrationDetector._unparse_expr(call_node.func.value)
+                    if rec_expr in imported_symbols:
+                        mod = imported_symbols[rec_expr]["source_module"]
+                        if LocalCodeGraphFallback._module_matches_path(mod, cs.file_path):
+                            return (
+                                "CONFIRMED_CONSTRUCTOR_CALL",
+                                f"Instantiates '{target_class}' via module import '{rec_expr}' ({cs.file_path})",
+                                0.95,
+                                0.05,
+                                False,
+                            )
+                    elif LocalCodeGraphFallback._module_matches_path(rec_expr, cs.file_path):
+                        return (
+                            "CONFIRMED_CONSTRUCTOR_CALL",
+                            f"Instantiates '{target_class}' via module path '{rec_expr}' ({cs.file_path})",
+                            0.95,
+                            0.05,
+                            False,
+                        )
+                    return None
+
+                # 2b. Explicit __init__: TargetClass.__init__(self, ...) or instance.__init__()
+                elif attr_name == "__init__":
+                    rec_node = call_node.func.value
+                    if isinstance(rec_node, ast.Name):
+                        rec_id = rec_node.id
+                        if rec_id == target_class:
+                            if rec_id in imported_symbols:
+                                mod = imported_symbols[rec_id]["source_module"]
+                                if LocalCodeGraphFallback._module_matches_path(mod, cs.file_path):
+                                    return (
+                                        "CONFIRMED_CLASS_METHOD_CALL",
+                                        f"Directly invokes '{target_class}.__init__' ({cs.file_path})",
+                                        0.95,
+                                        0.05,
+                                        False,
+                                    )
+                            elif is_same_file:
+                                return (
+                                    "CONFIRMED_CLASS_METHOD_CALL",
+                                    f"Directly invokes '{target_class}.__init__' in same file ({cs.file_path})",
+                                    0.95,
+                                    0.05,
+                                    False,
+                                )
+                        elif rec_id in ("self", "cls"):
+                            if enclosing_class == target_class:
+                                return (
+                                    "SAME_FILE_CLASS_CALL",
+                                    f"Invokes '__init__' on enclosing class '{target_class}'",
+                                    0.95,
+                                    0.05,
+                                    False,
+                                )
+                            else:
+                                return None
+                        elif rec_id in var_types and var_types[rec_id] == target_class:
+                            return (
+                                "CONFIRMED_CLASS_METHOD_CALL",
+                                f"Invokes '__init__' on instance '{rec_id}' of '{target_class}'",
+                                0.95,
+                                0.05,
+                                False,
+                            )
+                        else:
+                            return None
+                    elif isinstance(rec_node, ast.Call) and isinstance(rec_node.func, ast.Name) and rec_node.func.id == "super":
+                        if enclosing_class == target_class:
+                            return (
+                                "SAME_FILE_CLASS_CALL",
+                                f"Invokes 'super().__init__' within '{target_class}'",
+                                0.90,
+                                0.10,
+                                False,
+                            )
+                        else:
+                            return None
+                    return None
+            return None
+
+        # Case B: Class method matching (cs.class_name and cs.name != "__init__")
+        if cs.class_name:
+            target_class = cs.class_name
+            target_method = cs.name
+            if isinstance(call_node.func, ast.Attribute):
+                attr_name = call_node.func.attr
+                if attr_name != target_method:
+                    return None
+                rec_node = call_node.func.value
+                if isinstance(rec_node, ast.Name):
+                    rec_id = rec_node.id
+                    if rec_id == target_class:
+                        if rec_id in imported_symbols:
+                            mod = imported_symbols[rec_id]["source_module"]
+                            if LocalCodeGraphFallback._module_matches_path(mod, cs.file_path):
+                                return (
+                                    "CONFIRMED_CLASS_METHOD_CALL",
+                                    f"Calls method '{cs.qualified_name}' on class '{target_class}'",
+                                    0.95,
+                                    0.05,
+                                    False,
+                                )
+                        elif is_same_file:
+                            return (
+                                "CONFIRMED_CLASS_METHOD_CALL",
+                                f"Calls method '{cs.qualified_name}' on class '{target_class}' in same file",
+                                0.95,
+                                0.05,
+                                False,
+                            )
+                    elif rec_id in ("self", "cls"):
+                        if enclosing_class == target_class:
+                            return (
+                                "SAME_FILE_CLASS_CALL",
+                                f"Calls method '{target_method}' on '{rec_id}' in '{target_class}'",
+                                0.95,
+                                0.05,
+                                False,
+                            )
+                        else:
+                            return None
+                    elif rec_id in var_types and var_types[rec_id] == target_class:
+                        return (
+                            "CONFIRMED_METHOD_CALL",
+                            f"Calls method '{target_method}' on instance '{rec_id}' of '{target_class}'",
+                            0.95,
+                            0.05,
+                            False,
+                        )
+                    else:
+                        if target_method in cls.GENERIC_VERBS or target_method in LocalCodeGraphFallback.GENERIC_METHOD_NAMES:
+                            return None
+                        if target_class in imported_symbols:
+                            return (
+                                "AMBIGUOUS_SYMBOL_REFERENCE",
+                                f"Calls method '{target_method}' on unanchored receiver '{rec_id}'",
+                                0.60,
+                                0.40,
+                                True,
+                            )
+                        return None
+                elif isinstance(rec_node, ast.Attribute):
+                    rec_expr = EventRegistrationDetector._unparse_expr(rec_node)
+                    if target_class in rec_expr:
+                        return (
+                            "CONFIRMED_CLASS_METHOD_CALL",
+                            f"Calls method '{cs.qualified_name}' via '{rec_expr}'",
+                            0.95,
+                            0.05,
+                            False,
+                        )
+                    return None
+            elif isinstance(call_node.func, ast.Name):
+                called_id = call_node.func.id
+                if called_id in imported_symbols:
+                    info = imported_symbols[called_id]
+                    if info.get("original_symbol") == target_method:
+                        if LocalCodeGraphFallback._module_matches_path(info["source_module"], cs.file_path):
+                            return (
+                                "CONFIRMED_IMPORT_CALL",
+                                f"Directly calls imported method '{cs.qualified_name}'",
+                                0.95,
+                                0.05,
+                                False,
+                            )
+                return None
+            return None
+
+        # Case C: Top-level function matching (not cs.class_name)
+        target_fn = cs.name
+        if isinstance(call_node.func, ast.Name):
+            called_id = call_node.func.id
+            if called_id in imported_symbols:
+                info = imported_symbols[called_id]
+                if info.get("original_symbol") == target_fn:
+                    if LocalCodeGraphFallback._module_matches_path(info["source_module"], cs.file_path):
+                        return (
+                            "CONFIRMED_IMPORT_CALL",
+                            f"Directly calls imported function '{target_fn}' ({cs.file_path})",
+                            0.95,
+                            0.05,
+                            False,
+                        )
+                    else:
+                        return None
+            elif called_id == target_fn:
+                if is_same_file or LocalCodeGraphFallback._module_matches_path(norm_test_file, cs.file_path):
+                    return (
+                        "SAME_FILE_AST_CALL",
+                        f"Calls function '{target_fn}' in same module/file ({cs.file_path})",
+                        0.95,
+                        0.05,
+                        False,
+                    )
+                elif target_fn in cls.GENERIC_VERBS or target_fn in LocalCodeGraphFallback.GENERIC_METHOD_NAMES:
+                    return None
+                else:
+                    return (
+                        "EXACT_AST_CALL",
+                        f"Directly calls function '{target_fn}'",
+                        0.90,
+                        0.10,
+                        False,
+                    )
+            return None
+
+        elif isinstance(call_node.func, ast.Attribute):
+            attr_name = call_node.func.attr
+            if attr_name == target_fn:
+                rec_expr = EventRegistrationDetector._unparse_expr(call_node.func.value)
+                if rec_expr in imported_symbols:
+                    mod = imported_symbols[rec_expr]["source_module"]
+                    if LocalCodeGraphFallback._module_matches_path(mod, cs.file_path):
+                        return (
+                            "CONFIRMED_IMPORT_CALL",
+                            f"Calls function '{target_fn}' via module import '{rec_expr}' ({cs.file_path})",
+                            0.95,
+                            0.05,
+                            False,
+                        )
+                elif LocalCodeGraphFallback._module_matches_path(rec_expr, cs.file_path):
+                    return (
+                        "CONFIRMED_IMPORT_CALL",
+                        f"Calls function '{target_fn}' via module path '{rec_expr}' ({cs.file_path})",
+                        0.95,
+                        0.05,
+                        False,
+                    )
+                elif target_fn not in cls.GENERIC_VERBS and target_fn not in LocalCodeGraphFallback.GENERIC_METHOD_NAMES:
+                    return (
+                        "AMBIGUOUS_SYMBOL_REFERENCE",
+                        f"Calls function '{target_fn}' on unanchored receiver '{rec_expr}'",
+                        0.45,
+                        0.55,
+                        True,
+                    )
+            return None
+
+        return None
+
     def prioritize_tests(
         self,
         changed_symbols: list[ChangedSymbol],
@@ -1036,6 +1389,7 @@ class RepositoryEvolutionEngine:
         Inspects existing tests across the repository and maps them against changed symbols,
         event registrations, and direct/indirect impacts to compute a deterministic prioritized ranking.
         Distinguishes explicit event dispatch, behavior-supported coverage, and trigger-only candidates.
+        Uses qualified symbol identity and constructor/class resolution to eliminate false positives.
         """
         prioritized: list[PrioritizedTest] = []
         event_candidates: list[PrioritizedTest] = []
@@ -1047,14 +1401,14 @@ class RepositoryEvolutionEngine:
             else list({cs.file_path for cs in changed_symbols})
         )
 
-        # Build lookup tables for fast matching (filter out test files and test setup fixtures)
-        changed_sym_map = {
-            cs.name: cs for cs in changed_symbols
+        # Filter out test symbols and setup fixtures from changed symbols
+        valid_changed_symbols = [
+            cs for cs in changed_symbols
             if cs.name not in self.NON_TEST_METHODS
             and not cs.name.startswith("test_")
             and not cs.name.endswith("_test")
             and not any(t_dir in cs.file_path for t_dir in ("tests/", "test_", "/tests", "_test.py"))
-        }
+        ]
         direct_sym_map = {d.symbol_name: d for d in direct_impacts if d.impact_type == ImpactType.DIRECT}
         indirect_sym_map = {i.symbol_name: i for i in indirect_impacts if i.impact_type == ImpactType.INDIRECT}
         event_impacts = [d for d in direct_impacts if d.impact_type == ImpactType.EVENT_REGISTRATION]
@@ -1075,19 +1429,26 @@ class RepositoryEvolutionEngine:
                 continue
 
             # Index imports in this test file to anchor qualified / generic symbol calls
-            imported_symbols: dict[str, str] = {}
+            imported_symbols: dict[str, dict[str, str]] = {}
             for imp in ast.walk(tree):
                 if isinstance(imp, ast.ImportFrom):
                     mod = imp.module or ""
                     for alias in imp.names:
-                        imported_symbols[alias.asname or alias.name] = mod
+                        imported_symbols[alias.asname or alias.name] = {
+                            "source_module": mod,
+                            "original_symbol": alias.name,
+                        }
                 elif isinstance(imp, ast.Import):
                     for alias in imp.names:
-                        imported_symbols[alias.asname or alias.name] = alias.name
+                        imported_symbols[alias.asname or alias.name] = {
+                            "source_module": alias.name,
+                            "original_symbol": alias.name.split(".")[-1],
+                        }
 
             # Index helper functions and discover test items (functions and methods)
             local_helpers: dict[str, set[str]] = {}
             local_helpers_cmd_records: dict[str, list[CommandDispatchRecord]] = {}
+            local_helpers_matched_symbols: dict[str, list[tuple[ChangedSymbol, str, float, float, bool]]] = {}
             test_items: list[tuple[str, Optional[str], ast.AST, int]] = []  # (func_name, class_name, node, lineno)
 
             for item in tree.body:
@@ -1097,6 +1458,17 @@ class RepositoryEvolutionEngine:
                     elif item.name not in self.NON_TEST_METHODS:
                         local_helpers[item.name] = self._extract_call_names(item)
                         local_helpers_cmd_records[item.name] = self._extract_command_dispatch_records(item)
+                        h_vars = self._extract_local_var_types(item)
+                        h_matches = []
+                        for child in ast.walk(item):
+                            if isinstance(child, ast.Call):
+                                for cs in valid_changed_symbols:
+                                    m = self._evaluate_call_match(
+                                        child, cs, imported_symbols, rel_test_path, None, h_vars
+                                    )
+                                    if m and not m[4]:
+                                        h_matches.append((cs, m[0], m[2], m[3], m[4]))
+                        local_helpers_matched_symbols[item.name] = h_matches
                 elif isinstance(item, ast.ClassDef):
                     cls_name = item.name
                     for class_child in item.body:
@@ -1108,6 +1480,17 @@ class RepositoryEvolutionEngine:
                             else:
                                 local_helpers[class_child.name] = self._extract_call_names(class_child)
                                 local_helpers_cmd_records[class_child.name] = self._extract_command_dispatch_records(class_child)
+                                h_vars = self._extract_local_var_types(class_child)
+                                h_matches = []
+                                for child in ast.walk(class_child):
+                                    if isinstance(child, ast.Call):
+                                        for cs in valid_changed_symbols:
+                                            m = self._evaluate_call_match(
+                                                child, cs, imported_symbols, rel_test_path, cls_name, h_vars
+                                            )
+                                            if m and not m[4]:
+                                                h_matches.append((cs, m[0], m[2], m[3], m[4]))
+                                local_helpers_matched_symbols[class_child.name] = h_matches
 
             # Compute transitive closure for local_helpers so nested helper invocations are fully expanded
             closure_changed = True
@@ -1116,7 +1499,9 @@ class RepositoryEvolutionEngine:
                 for h_name, targets in list(local_helpers.items()):
                     expanded = set(targets)
                     cmd_recs = list(local_helpers_cmd_records.get(h_name, []))
+                    matched_syms = list(local_helpers_matched_symbols.get(h_name, []))
                     seen_cmds = {(r.command_name, r.dispatch_api) for r in cmd_recs}
+                    seen_matched = {m[0].canonical_id for m in matched_syms}
                     for t in targets:
                         if t in local_helpers:
                             expanded.update(local_helpers[t])
@@ -1125,9 +1510,19 @@ class RepositoryEvolutionEngine:
                                 if (r.command_name, r.dispatch_api) not in seen_cmds:
                                     cmd_recs.append(r)
                                     seen_cmds.add((r.command_name, r.dispatch_api))
-                    if len(expanded) > len(targets) or len(cmd_recs) > len(local_helpers_cmd_records.get(h_name, [])):
+                        if t in local_helpers_matched_symbols:
+                            for m in local_helpers_matched_symbols[t]:
+                                if m[0].canonical_id not in seen_matched:
+                                    matched_syms.append(m)
+                                    seen_matched.add(m[0].canonical_id)
+                    if (
+                        len(expanded) > len(targets)
+                        or len(cmd_recs) > len(local_helpers_cmd_records.get(h_name, []))
+                        or len(matched_syms) > len(local_helpers_matched_symbols.get(h_name, []))
+                    ):
                         local_helpers[h_name] = expanded
                         local_helpers_cmd_records[h_name] = cmd_recs
+                        local_helpers_matched_symbols[h_name] = matched_syms
                         closure_changed = True
 
             for func_name, class_name, node, lineno in test_items:
@@ -1137,6 +1532,8 @@ class RepositoryEvolutionEngine:
                 if test_key in seen_tests:
                     continue
 
+                local_var_types = self._extract_local_var_types(node)
+
                 # Extract all call targets and expressions inside this test
                 direct_called: set[str] = set()
                 attribute_calls: set[str] = set()
@@ -1144,6 +1541,8 @@ class RepositoryEvolutionEngine:
                 helper_calls: set[str] = set()
                 qualified_receivers: set[str] = set()
                 command_records = self._extract_command_dispatch_records(node)
+
+                direct_matches: list[tuple[ChangedSymbol, str, str, float, float, bool]] = []
 
                 for child in ast.walk(node):
                     if isinstance(child, ast.Call):
@@ -1162,6 +1561,13 @@ class RepositoryEvolutionEngine:
                             if rec_name in ("self", "cls") and attr_name in local_helpers:
                                 helper_calls.add(attr_name)
 
+                        for cs in valid_changed_symbols:
+                            m = self._evaluate_call_match(
+                                child, cs, imported_symbols, rel_test_path, class_name, local_var_types
+                            )
+                            if m:
+                                direct_matches.append((cs, m[0], m[1], m[2], m[3], m[4]))
+
                 # Expand called_symbols and command_records with targets called by invoked helpers
                 called_symbols: set[str] = set(direct_called)
                 for h_name in helper_calls:
@@ -1170,17 +1576,19 @@ class RepositoryEvolutionEngine:
                         if not any(cr.command_name == r.command_name and cr.dispatch_api == r.dispatch_api for cr in command_records):
                             command_records.append(r)
 
-                # Tier 1: Test directly calls a changed symbol
-                direct_matches = [
-                    s for s in direct_called
-                    if s in changed_sym_map and self._is_valid_direct_match(s, changed_sym_map, imported_symbols, qualified_receivers)
-                ]
-                if direct_matches:
-                    matched_sym = sorted(
-                        direct_matches,
-                        key=lambda s: (0 if changed_sym_map[s].change_type == ChangeType.MODIFIED else 1, s),
+                # Tier 1: Test directly calls a changed symbol (confirmed match)
+                confirmed_direct_matches = [m for m in direct_matches if not m[5]]
+                if confirmed_direct_matches:
+                    best_match = sorted(
+                        confirmed_direct_matches,
+                        key=lambda m: (
+                            0 if m[0].change_type == ChangeType.MODIFIED else 1,
+                            -m[3],  # confidence
+                            m[0].canonical_id,
+                        ),
                     )[0]
-                    cs = changed_sym_map[matched_sym]
+                    cs, match_qual, desc, conf, unc, is_ambig = best_match
+                    target_sym_display = cs.qualified_name
                     seen_tests.add(test_key)
                     prioritized.append(
                         PrioritizedTest(
@@ -1189,52 +1597,59 @@ class RepositoryEvolutionEngine:
                             line_number=lineno,
                             priority_tier=PriorityTier.CRITICAL,
                             priority_score=0.98,
-                            confidence=0.95,
-                            reason=f"Direct test of changed symbol '{matched_sym}' in {cs.file_path}",
-                            selection_reason=f"Directly calls changed symbol '{matched_sym}' in {cs.file_path}. Immediate regression test recommended.",
-                            targeted_symbol=matched_sym,
+                            confidence=conf,
+                            reason=f"Direct test of changed symbol '{target_sym_display}' in {cs.file_path}",
+                            selection_reason=f"Directly calls changed symbol '{target_sym_display}' in {cs.file_path}. Immediate regression test recommended.",
+                            targeted_symbol=target_sym_display,
                             targeted_file=cs.file_path,
                             call_depth=1,
                             impact_distance="direct",
                             evidence_type="confirmed",
                             match_classification=EventMatchClassification.NO_RELEVANT_EVENT_EVIDENCE,
-                            explanation=f"Directly calls changed symbol '{matched_sym}' in {cs.file_path}. Immediate regression test recommended.",
+                            explanation=f"Directly calls changed symbol '{target_sym_display}' in {cs.file_path}. Immediate regression test recommended.",
                             execution_command=f"pytest {rel_test_path}::{test_identifier} -v",
                             evidence=EvidenceTrail(
-                                call_chain=[test_identifier, matched_sym],
+                                call_chain=[test_identifier, target_sym_display],
                                 caller_file=rel_test_path,
                                 line_number=lineno,
                                 resolution_engine="ast_call_match",
-                                match_quality="EXACT_AST_CALL",
+                                match_quality=match_qual,
                                 evidence_source="AST Call Match",
-                                call_path_description=f"{test_identifier} -> {matched_sym}",
+                                call_path_description=f"{test_identifier} -> {target_sym_display}",
                                 is_ambiguous=False,
                             ),
                             structured_evidence=[
                                 EvidenceItem(
                                     type="CHANGED_SYMBOL_REFERENCE",
-                                    description=f"Directly calls changed symbol '{matched_sym}' in {cs.file_path}.",
+                                    description=desc,
                                     source_file=rel_test_path,
                                     line=lineno,
                                 )
                             ],
-                            uncertainty_score=0.05,
+                            uncertainty_score=unc,
                         )
                     )
                     continue
 
                 # Tier 1b: Test calls changed symbol via local helper
-                helper_syms = called_symbols - direct_called
-                helper_matches = [
-                    s for s in helper_syms
-                    if s in changed_sym_map and self._is_valid_direct_match(s, changed_sym_map, imported_symbols, qualified_receivers)
-                ]
+                helper_matches: list[tuple[str, ChangedSymbol, str, float, float]] = []
+                for h_name in helper_calls:
+                    if h_name in local_helpers_matched_symbols:
+                        for cs, m_qual, conf, unc, is_ambig in local_helpers_matched_symbols[h_name]:
+                            if not is_ambig:
+                                helper_matches.append((h_name, cs, m_qual, conf, unc))
+
                 if helper_matches:
-                    matched_sym = sorted(
+                    best_helper = sorted(
                         helper_matches,
-                        key=lambda s: (0 if changed_sym_map[s].change_type == ChangeType.MODIFIED else 1, s),
+                        key=lambda hm: (
+                            0 if hm[1].change_type == ChangeType.MODIFIED else 1,
+                            -hm[3],
+                            hm[1].canonical_id,
+                        ),
                     )[0]
-                    cs = changed_sym_map[matched_sym]
+                    h_name, cs, match_qual, conf, unc = best_helper
+                    target_sym_display = cs.qualified_name
                     seen_tests.add(test_key)
                     prioritized.append(
                         PrioritizedTest(
@@ -1244,30 +1659,30 @@ class RepositoryEvolutionEngine:
                             priority_tier=PriorityTier.HIGH,
                             priority_score=0.85,
                             confidence=0.85,
-                            reason=f"Tests changed symbol '{matched_sym}' via helper in {rel_test_path}",
-                            selection_reason=f"Invokes test helper that calls changed symbol '{matched_sym}'.",
-                            targeted_symbol=matched_sym,
+                            reason=f"Tests changed symbol '{target_sym_display}' via helper in {rel_test_path}",
+                            selection_reason=f"Invokes test helper that calls changed symbol '{target_sym_display}'.",
+                            targeted_symbol=target_sym_display,
                             targeted_file=cs.file_path,
                             call_depth=2,
                             impact_distance="1 hop (helper)",
                             evidence_type="confirmed",
                             match_classification=EventMatchClassification.NO_RELEVANT_EVENT_EVIDENCE,
-                            explanation=f"Invokes test helper that calls changed symbol '{matched_sym}'.",
+                            explanation=f"Invokes test helper that calls changed symbol '{target_sym_display}'.",
                             execution_command=f"pytest {rel_test_path}::{test_identifier} -v",
                             evidence=EvidenceTrail(
-                                call_chain=[test_identifier, "helper", matched_sym],
+                                call_chain=[test_identifier, h_name, target_sym_display],
                                 caller_file=rel_test_path,
                                 line_number=lineno,
                                 resolution_engine="ast_helper_call_match",
                                 match_quality="HELPER_DEPENDENCY",
                                 evidence_source="AST Helper Call Match",
-                                call_path_description=f"{test_identifier} -> helper -> {matched_sym}",
+                                call_path_description=f"{test_identifier} -> {h_name} -> {target_sym_display}",
                                 is_ambiguous=False,
                             ),
                             structured_evidence=[
                                 EvidenceItem(
                                     type="HELPER_CALL",
-                                    description=f"Invokes test helper that calls changed symbol '{matched_sym}'.",
+                                    description=f"Invokes test helper '{h_name}' which calls changed symbol '{target_sym_display}'.",
                                     source_file=rel_test_path,
                                     line=lineno,
                                 )
@@ -1438,7 +1853,9 @@ class RepositoryEvolutionEngine:
                 # Tier 2: Test calls a direct (1-hop) impacted caller
                 direct_caller_matches = [
                     s for s in called_symbols
-                    if s in direct_sym_map and s not in self.GENERIC_VERBS
+                    if s in direct_sym_map
+                    and s not in self.GENERIC_VERBS
+                    and s not in LocalCodeGraphFallback.GENERIC_METHOD_NAMES
                 ]
                 if direct_caller_matches:
                     matched_caller = sorted(direct_caller_matches)[0]
@@ -1489,7 +1906,9 @@ class RepositoryEvolutionEngine:
                 # Tier 3: Test calls an indirect (2+ hops) impacted caller
                 indirect_caller_matches = [
                     s for s in called_symbols
-                    if s in indirect_sym_map and s not in self.GENERIC_VERBS
+                    if s in indirect_sym_map
+                    and s not in self.GENERIC_VERBS
+                    and s not in LocalCodeGraphFallback.GENERIC_METHOD_NAMES
                 ]
                 if indirect_caller_matches:
                     matched_indirect = sorted(indirect_caller_matches)[0]
