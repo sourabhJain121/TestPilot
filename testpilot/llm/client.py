@@ -152,7 +152,8 @@ def calculate_discount(coupon_code, subtotal):
         prompt: str,
         system_instruction: Optional[str] = None,
         json_format: bool = False,
-        temperature: float = 0.2,
+        temperature: float = 0.0,
+        options: Optional[dict[str, Any]] = None,
     ) -> str:
         """
         Generate completion from the local Ollama model or deterministic CI fixture.
@@ -165,13 +166,14 @@ def calculate_discount(coupon_code, subtotal):
             return self._generate_ci_offline_fixture(prompt, json_format=json_format)
 
         endpoint = f"{self.base_url}/api/generate"
+        gen_opts = {"temperature": temperature}
+        if options:
+            gen_opts.update(options)
         payload = {
             "model": self.model,
             "prompt": prompt,
             "stream": False,
-            "options": {
-                "temperature": temperature,
-            },
+            "options": gen_opts,
         }
         if system_instruction:
             payload["system"] = system_instruction

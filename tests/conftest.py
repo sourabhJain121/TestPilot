@@ -9,3 +9,16 @@ warnings.filterwarnings("ignore", category=UserWarning)
 os.environ.setdefault("TESTPILOT_CI_MODE", "true")
 if os.getenv("TESTPILOT_OFFLINE_MODE", "").lower() in ("true", "1", "yes") or os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes"):
     os.environ["TESTPILOT_CI_MODE"] = "true"
+
+
+import pytest  # noqa: E402
+
+from testpilot.core.context import AnalysisContextManager  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def clean_analysis_context():
+    mgr = AnalysisContextManager()
+    mgr.reset_active_context()
+    yield
+    mgr.reset_active_context()

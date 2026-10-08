@@ -2,7 +2,12 @@
 Unit tests for Sourcegraph client and Local AST Fallback.
 """
 
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
 from testpilot.sourcegraph.client import LocalCodeGraphFallback, SourcegraphClient
+from testpilot.web.api import app
 
 
 def test_sourcegraph_client_fallback_mode():
@@ -112,3 +117,171 @@ def test_sourcegraph_mocked_online_flow(monkeypatch):
     assert len(defs) == 1
     assert defs[0]["source_type"] == "sourcegraph_graphql"
     assert defs[0]["line_number"] == 42
+
+
+# =============================================================================
+# Code Intelligence UI & API Test Suite (Requirements 1-12)
+# =============================================================================
+
+
+def test_1_symbol_search():
+    client = SourcegraphClient(repo_root=".")
+    res = client.search("calculate_order_totals", search_type="symbol")
+    assert res["query"] == "calculate_order_totals"
+    assert "definitions" in res
+    assert "references" in res
+    assert "relationships" in res
+    assert res["counts"]["total"] >= 1
+    assert len(res["definitions"]) >= 1
+    assert res["definitions"][0]["symbol_name"] == "calculate_order_totals"
+
+
+def test_2_function_search():
+    client = SourcegraphClient(repo_root=".")
+    funcs = client.search_functions("calculate_order_totals")
+    assert isinstance(funcs, list)
+    assert len(funcs) >= 1
+    assert funcs[0]["kind"] == "FUNCTION"
+    assert "order_service.py" in funcs[0]["file_path"]
+
+
+def test_3_definition_search():
+    client = SourcegraphClient(repo_root=".")
+    defs = client.find_definitions("calculate_order_totals")
+    assert len(defs) >= 1
+    assert defs[0]["line_number"] > 0
+    assert "qualified_symbol" in defs[0]
+    assert "order_service.calculate_order_totals" in defs[0]["qualified_symbol"]
+
+
+def test_4_reference_search():
+    client = SourcegraphClient(repo_root=".")
+    refs = client.find_references("calculate_order_totals")
+    assert len(refs) >= 1
+    assert all("file_path" in r and "line_number" in r for r in refs)
+
+
+def test_5_test_reference_search():
+    client = SourcegraphClient(repo_root=".")
+    t_refs = client.find_test_references("calculate_order_totals")
+    assert len(t_refs) >= 1
+    for r in t_refs:
+        assert "test" in r["file_path"].lower()
+
+
+def test_6_class_usage_search():
+    client = SourcegraphClient(repo_root=".")
+    usages = client.find_class_usages("OrderService")
+    assert len(usages) >= 1
+    assert any("order_service" in u["file_path"].lower() or "test" in u["file_path"].lower() for u in usages)
+
+
+def test_7_sourcegraph_unavailable_mode(monkeypatch):
+    client = SourcegraphClient()
+    monkeypatch.setattr(client, "is_available", lambda: False)
+    monkeypatch.setattr(client, "is_alive", lambda: False)
+    assert client.is_available() is False
+    assert client.is_alive() is False
+
+    res = client.search("calculate_order_totals")
+    assert res["engine_status"] == "FALLBACK"
+    assert res["source"] == "local_ast_fallback"
+    assert "Local AST Fallback" in res["engine_label"]
+
+
+def test_8_local_ast_fallback_behavior():
+    fallback = LocalCodeGraphFallback(repo_root=".")
+    defs = fallback.find_definitions("calculate_order_totals")
+    assert len(defs) >= 1
+    assert defs[0]["source_type"] == "local_ast_fallback"
+    assert "AST" in defs[0]["evidence_reason"]
+    assert defs[0]["qualified_symbol"].endswith("calculate_order_totals")
+
+
+def test_9_empty_search_result():
+    client = SourcegraphClient(repo_root=".")
+    nonexistent = "nonexistent_sym_" + "does_not_exist_98765"
+    res = client.search(nonexistent)
+    assert res["counts"]["total"] == 0
+    assert len(res["definitions"]) == 0
+    assert len(res["references"]) == 0
+    assert len(res["test_references"]) == 0
+    assert len(res["class_usages"]) == 0
+    assert len(res["code_matches"]) == 0
+
+
+def test_10_invalid_or_empty_search():
+    client = SourcegraphClient(repo_root=".")
+    res_empty = client.search("   ")
+    assert res_empty["counts"]["total"] == 0
+    assert res_empty["definitions"] == []
+
+    # Safe snippet retrieval on nonexistent file
+    snip = client.read_source_snippet("nonexistent/path/does_not_exist.py", 10)
+    assert "File not found" in snip["code"]
+    assert snip["total_lines"] == 0
+
+
+def test_11_api_response_structure():
+    api_client = TestClient(app)
+
+    # Status endpoint
+    r_status = api_client.get("/api/code-intel/status")
+    assert r_status.status_code == 200
+    st_json = r_status.json()
+    assert "status" in st_json
+    assert "engine_label" in st_json
+    assert "source" in st_json
+    assert "research_note" in st_json
+
+    # Search endpoint
+    r_search = api_client.get("/api/code-intel/search?query=calculate_order_totals&search_type=symbol")
+    assert r_search.status_code == 200
+    s_json = r_search.json()
+    assert s_json["query"] == "calculate_order_totals"
+    assert "definitions" in s_json
+    assert "references" in s_json
+    assert "relationships" in s_json
+    assert "counts" in s_json
+    assert "total_matches" in s_json
+
+    # Source snippet endpoint
+    r_src = api_client.get("/api/code-intel/source?file_path=testbed/app/services/order_service.py&line_number=77")
+    assert r_src.status_code == 200
+    src_json = r_src.json()
+    assert "lines" in src_json
+    assert src_json["line_number"] == 77
+    assert src_json["total_lines"] > 0
+    assert any(line["is_target"] for line in src_json["lines"])
+
+    # Dedicated category endpoints
+    r_defs = api_client.get("/api/sourcegraph/definitions?symbol=calculate_order_totals")
+    assert r_defs.status_code == 200
+    assert r_defs.json()["total"] >= 1
+
+    r_refs = api_client.get("/api/sourcegraph/references?symbol=calculate_order_totals")
+    assert r_refs.status_code == 200
+    assert r_refs.json()["total"] >= 1
+
+
+def test_12_ui_rendering_structure():
+    html_file = Path("testpilot/web/static/index.html")
+    assert html_file.exists()
+    content = html_file.read_text(encoding="utf-8")
+
+    # Navbar item
+    assert 'id="tab-btn-code-intel"' in content
+    assert "Code Intelligence" in content
+
+    # Tab panel
+    assert 'id="tab-code-intel"' in content
+    assert 'id="code-intel-status-pill"' in content
+    assert 'id="code-intel-query"' in content
+    assert 'id="code-intel-type"' in content
+    assert 'id="code-intel-repo"' in content
+    assert 'id="btn-code-intel-search"' in content
+    assert 'id="code-intel-results-wrapper"' in content
+    assert 'id="code-intel-source-modal"' in content
+
+    # Factual statement (Requirement 22)
+    assert "Code Intelligence exposes repository definitions and references used by TestPilot's impact analysis." in content

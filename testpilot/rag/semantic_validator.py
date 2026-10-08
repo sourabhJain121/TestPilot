@@ -258,7 +258,12 @@ Return ONLY a valid JSON object matching this schema:
         )
 
         try:
-            resp = self.llm.generate(prompt=prompt, json_format=True)
+            resp = self.llm.generate(
+                prompt=prompt,
+                json_format=True,
+                temperature=0.0,
+                options={"num_predict": 384},
+            )
             res = self._parse_response(resp, default_relevant=is_confirmed_deterministic)
             res.retrieved_context_ids = rag_ids
             res.sourcegraph_evidence_ids = sg_ids

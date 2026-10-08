@@ -482,6 +482,9 @@ class RepositoryEvolutionEngine:
             if any(t_dir in cs.file_path for t_dir in ("tests/", "test_", "/tests", "_test.py")):
                 continue
             visited_nodes.add((cs.qualified_name, cs.file_path))
+            visited_nodes.add((cs.name, cs.file_path))
+            if cs.class_name:
+                visited_nodes.add((f"{cs.class_name}.{cs.name}", cs.file_path))
             queue.append((cs.name, cs.file_path, cs.class_name, 1, cs.qualified_name, cs.file_path, [cs.qualified_name]))
 
             # Discover static event registrations for changed symbol
@@ -553,13 +556,26 @@ class RepositoryEvolutionEngine:
 
                 # Skip module-level execution wrappers or tests in this impact graph
                 # (tests are evaluated separately in prioritize_tests)
-                if any(t_dir in c_file for t_dir in ("tests/", "test_", "/tests")):
+                if any(t_dir in c_file for t_dir in ("tests/", "test_", "/tests", "_test.py")):
+                    continue
+
+                if c_name in ("<module>", "<module_level>"):
                     continue
 
                 node_key = (c_name, c_file)
-                if node_key in visited_nodes:
+                c_qual = f"{c_class}.{c_name}" if c_class else c_name
+                qual_key = (c_qual, c_file)
+
+                # Deduplication and cycle prevention:
+                if node_key in visited_nodes or qual_key in visited_nodes:
                     continue
+
+                # Prevent self-references / self-loops:
+                if (c_name == root_sym or c_qual == root_sym) and c_file == root_file:
+                    continue
+
                 visited_nodes.add(node_key)
+                visited_nodes.add(qual_key)
 
                 # Compute evidence and uncertainty
                 new_chain = [*chain, c_name]
@@ -628,7 +644,7 @@ class RepositoryEvolutionEngine:
                     indirect_impacts.append(impact_node)
 
                 # Enqueue for next hop if depth < max_depth
-                if depth < max_depth and c_name != "<module>":
+                if depth < max_depth and c_name not in ("<module>", "<module_level>"):
                     queue.append((c_name, c_file, c_class, depth + 1, root_sym, root_file, new_chain))
 
         return direct_impacts, indirect_impacts
@@ -1267,6 +1283,18 @@ class RepositoryEvolutionEngine:
                             False,
                         )
                     else:
+                        if rec_id in ("app", "client", target_class.lower()) and (
+                            target_class in imported_symbols
+                            or any(m in imported_symbols for m in ("flask", "django", "testbed"))
+                            or is_same_file
+                        ):
+                            return (
+                                "CONFIRMED_METHOD_CALL",
+                                f"Calls method '{target_method}' on fixture/instance '{rec_id}' of '{target_class}'",
+                                0.95,
+                                0.05,
+                                False,
+                            )
                         if target_method in cls.GENERIC_VERBS or target_method in LocalCodeGraphFallback.GENERIC_METHOD_NAMES:
                             return None
                         if target_class in imported_symbols:
@@ -1401,13 +1429,15 @@ class RepositoryEvolutionEngine:
             else list({cs.file_path for cs in changed_symbols})
         )
 
+        def _is_test_path(fp: str) -> bool:
+            return any(t_dir in fp for t_dir in ("tests/", "test_", "/tests", "_test.py"))
+
         # Filter out test symbols and setup fixtures from changed symbols
         valid_changed_symbols = [
             cs for cs in changed_symbols
             if cs.name not in self.NON_TEST_METHODS
-            and not cs.name.startswith("test_")
-            and not cs.name.endswith("_test")
-            and not any(t_dir in cs.file_path for t_dir in ("tests/", "test_", "/tests", "_test.py"))
+            and not (_is_test_path(cs.file_path) and (cs.name.startswith("test_") or cs.name.endswith("_test")))
+            and not _is_test_path(cs.file_path)
         ]
         direct_sym_map = {d.symbol_name: d for d in direct_impacts if d.impact_type == ImpactType.DIRECT}
         indirect_sym_map = {i.symbol_name: i for i in indirect_impacts if i.impact_type == ImpactType.INDIRECT}

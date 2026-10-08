@@ -1623,3 +1623,293 @@ class GenuinePermissionRenameTests:
     assert genuine_stdout.match_classification == EventMatchClassification.BEHAVIORAL_COVERAGE
     assert genuine_stdout.priority_tier == PriorityTier.HIGH
     assert genuine_stdout.priority_score == 0.85
+
+
+# =========================================================================
+# Targeted Regression Tests: Transitive Call-Graph Blast Radius
+# =========================================================================
+
+def test_transitive_blast_radius_direct_caller_detection():
+    """1. Direct caller detection: calculate_tax is called by calculate_order_totals."""
+    engine = RepositoryEvolutionEngine(repo_root=".")
+    sym = ChangedSymbol(
+        name="calculate_tax",
+        class_name="OrderService",
+        file_path="testbed/app/services/order_service.py",
+        line_start=63,
+        line_end=75,
+        change_type=ChangeType.MODIFIED,
+    )
+    direct, indirect = engine.build_transitive_impact_graph([sym], max_depth=1)
+    direct_names = [d.symbol_name for d in direct if d.impact_type == ImpactType.DIRECT]
+    assert "calculate_order_totals" in direct_names
+    assert len(indirect) == 0
+    node = next(d for d in direct if d.symbol_name == "calculate_order_totals")
+    assert node.depth == 1
+    assert node.impact_type == ImpactType.DIRECT
+    assert node.evidence.evidence_source in ("Local AST Call Graph", "Sourcegraph OSS")
+
+
+def test_transitive_blast_radius_one_level_transitive_caller():
+    """2. One-level transitive caller: calculate_tax -> calculate_order_totals -> create_order (depth 2)."""
+    engine = RepositoryEvolutionEngine(repo_root=".")
+    sym = ChangedSymbol(
+        name="calculate_tax",
+        class_name="OrderService",
+        file_path="testbed/app/services/order_service.py",
+        line_start=63,
+        line_end=75,
+        change_type=ChangeType.MODIFIED,
+    )
+    direct, indirect = engine.build_transitive_impact_graph([sym], max_depth=2)
+    direct_names = [d.symbol_name for d in direct if d.impact_type == ImpactType.DIRECT]
+    indirect_names = [i.symbol_name for i in indirect if i.impact_type == ImpactType.INDIRECT]
+
+    assert "calculate_order_totals" in direct_names
+    assert "create_order" in indirect_names
+    ind_node = next(i for i in indirect if i.symbol_name == "create_order")
+    assert ind_node.depth == 2
+    assert ind_node.impact_type == ImpactType.INDIRECT
+    assert "calculate_order_totals" in ind_node.evidence.call_chain
+
+
+def test_transitive_blast_radius_multi_level_transitive_fixture(tmp_path):
+    """3. Multi-level transitive caller: A -> B -> C -> D across files and depth hops."""
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "pkg" / "a.py").write_text(
+        "def func_a():\n"
+        "    return 42\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pkg" / "b.py").write_text(
+        "from pkg.a import func_a\n"
+        "def func_b():\n"
+        "    return func_a() + 1\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pkg" / "c.py").write_text(
+        "from pkg.b import func_b\n"
+        "def func_c():\n"
+        "    return func_b() * 2\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pkg" / "d.py").write_text(
+        "from pkg.c import func_c\n"
+        "def func_d():\n"
+        "    return func_c() - 5\n",
+        encoding="utf-8",
+    )
+
+    engine = RepositoryEvolutionEngine(repo_root=str(tmp_path))
+    sym = ChangedSymbol(
+        name="func_a",
+        file_path="pkg/a.py",
+        line_start=1,
+        line_end=3,
+        change_type=ChangeType.MODIFIED,
+    )
+    direct, indirect = engine.build_transitive_impact_graph([sym], max_depth=3)
+    d_names = [d.symbol_name for d in direct]
+    i_names = [i.symbol_name for i in indirect]
+
+    assert "func_b" in d_names  # Depth 1
+    assert "func_c" in i_names  # Depth 2
+    assert "func_d" in i_names  # Depth 3
+
+    node_d = next(i for i in indirect if i.symbol_name == "func_d")
+    assert node_d.depth == 3
+    assert node_d.evidence.call_chain == ["func_a", "func_b", "func_c", "func_d"]
+
+
+def test_transitive_blast_radius_max_depth_enforcement(tmp_path):
+    """4. max_depth parameter strictly bounds the traversal depth."""
+    (tmp_path / "mod").mkdir()
+    (tmp_path / "mod" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "mod" / "step0.py").write_text("def step_0(): return 0\n", encoding="utf-8")
+    (tmp_path / "mod" / "step1.py").write_text("from mod.step0 import step_0\ndef step_1(): return step_0()\n", encoding="utf-8")
+    (tmp_path / "mod" / "step2.py").write_text("from mod.step1 import step_1\ndef step_2(): return step_1()\n", encoding="utf-8")
+    (tmp_path / "mod" / "step3.py").write_text("from mod.step2 import step_2\ndef step_3(): return step_2()\n", encoding="utf-8")
+
+    engine = RepositoryEvolutionEngine(repo_root=str(tmp_path))
+    sym = ChangedSymbol(name="step_0", file_path="mod/step0.py", line_start=1, line_end=2)
+
+    # Depth 1: Only step_1
+    d1, ind1 = engine.build_transitive_impact_graph([sym], max_depth=1)
+    assert [d.symbol_name for d in d1] == ["step_1"]
+    assert len(ind1) == 0
+
+    # Depth 2: step_1 (direct) + step_2 (indirect)
+    d2, ind2 = engine.build_transitive_impact_graph([sym], max_depth=2)
+    assert [d.symbol_name for d in d2] == ["step_1"]
+    assert [i.symbol_name for i in ind2] == ["step_2"]
+
+    # Depth 3: step_1 (direct) + step_2, step_3 (indirect)
+    d3, ind3 = engine.build_transitive_impact_graph([sym], max_depth=3)
+    assert [d.symbol_name for d in d3] == ["step_1"]
+    assert {i.symbol_name for i in ind3} == {"step_2", "step_3"}
+
+
+def test_transitive_blast_radius_cycle_prevention(tmp_path):
+    """5. Cycle prevention: Mutually recursive functions (ping -> pong -> ping) terminate cleanly."""
+    (tmp_path / "cyc").mkdir()
+    (tmp_path / "cyc" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "cyc" / "loop.py").write_text(
+        "def ping(n):\n"
+        "    if n > 0:\n"
+        "        return pong(n - 1)\n"
+        "    return 0\n\n"
+        "def pong(n):\n"
+        "    if n > 0:\n"
+        "        return ping(n - 1)\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+
+    engine = RepositoryEvolutionEngine(repo_root=str(tmp_path))
+    sym = ChangedSymbol(name="ping", file_path="cyc/loop.py", line_start=1, line_end=5)
+    direct, indirect = engine.build_transitive_impact_graph([sym], max_depth=4)
+
+    # pong calls ping directly -> depth 1
+    assert len(direct) == 1
+    assert direct[0].symbol_name == "pong"
+    # ping itself must NOT be re-added as an indirect caller of itself!
+    assert not any(i.symbol_name == "ping" for i in indirect)
+
+
+def test_transitive_blast_radius_duplicate_prevention(tmp_path):
+    """6. Duplicate prevention: Diamond dependencies (A -> B -> D, A -> C -> D) only record D once."""
+    (tmp_path / "diamond").mkdir()
+    (tmp_path / "diamond" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "diamond" / "base.py").write_text("def base_fn(): return 1\n", encoding="utf-8")
+    (tmp_path / "diamond" / "left.py").write_text(
+        "from diamond.base import base_fn\n"
+        "def left_fn(): return base_fn()\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "diamond" / "right.py").write_text(
+        "from diamond.base import base_fn\n"
+        "def right_fn(): return base_fn()\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "diamond" / "top.py").write_text(
+        "from diamond.left import left_fn\n"
+        "from diamond.right import right_fn\n"
+        "def top_fn(): return left_fn() + right_fn()\n",
+        encoding="utf-8",
+    )
+
+    engine = RepositoryEvolutionEngine(repo_root=str(tmp_path))
+    sym = ChangedSymbol(name="base_fn", file_path="diamond/base.py", line_start=1, line_end=2)
+    direct, indirect = engine.build_transitive_impact_graph([sym], max_depth=3)
+
+    assert {d.symbol_name for d in direct} == {"left_fn", "right_fn"}
+    # top_fn should appear exactly once in indirect impacts
+    top_matches = [i for i in indirect if i.symbol_name == "top_fn"]
+    assert len(top_matches) == 1
+
+
+def test_transitive_blast_radius_qualified_symbol_collision_avoidance(tmp_path):
+    """7. Qualified symbol collision: Two classes sharing the method name 'execute' are distinguished."""
+    (tmp_path / "workers").mkdir()
+    (tmp_path / "workers" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "workers" / "payment_worker.py").write_text(
+        "class PaymentWorker:\n"
+        "    def execute(self):\n"
+        "        return 'paid'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "workers" / "email_worker.py").write_text(
+        "class EmailWorker:\n"
+        "    def execute(self):\n"
+        "        return 'emailed'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "workers" / "caller.py").write_text(
+        "from workers.payment_worker import PaymentWorker\n"
+        "from workers.email_worker import EmailWorker\n\n"
+        "def run_payment():\n"
+        "    w = PaymentWorker()\n"
+        "    return w.execute()\n\n"
+        "def run_email():\n"
+        "    e = EmailWorker()\n"
+        "    return e.execute()\n",
+        encoding="utf-8",
+    )
+
+    engine = RepositoryEvolutionEngine(repo_root=str(tmp_path))
+    pay_sym = ChangedSymbol(
+        name="execute",
+        class_name="PaymentWorker",
+        file_path="workers/payment_worker.py",
+        line_start=2,
+        line_end=4,
+    )
+    direct, indirect = engine.build_transitive_impact_graph([pay_sym], max_depth=2)
+
+    # Caller of PaymentWorker.execute must be run_payment, NOT run_email
+    d_names = [d.symbol_name for d in direct]
+    assert "run_payment" in d_names
+    assert "run_email" not in d_names
+
+
+def test_transitive_blast_radius_zero_downstream_callers(tmp_path):
+    """8. Zero downstream callers: Isolated leaf function returns 0 direct and 0 indirect callers."""
+    (tmp_path / "leaf").mkdir()
+    (tmp_path / "leaf" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "leaf" / "isolated.py").write_text(
+        "def standalone_utility():\n"
+        "    return 'nobody calls me'\n",
+        encoding="utf-8",
+    )
+
+    engine = RepositoryEvolutionEngine(repo_root=str(tmp_path))
+    sym = ChangedSymbol(name="standalone_utility", file_path="leaf/isolated.py", line_start=1, line_end=3)
+    direct, indirect = engine.build_transitive_impact_graph([sym], max_depth=3)
+
+    assert len(direct) == 0
+    assert len(indirect) == 0
+
+
+def test_transitive_blast_radius_traversal_failure_handling():
+    """9. Invalid git reference raises InvalidGitReferenceError instead of returning silent 0s."""
+    from testpilot.evolution.engine import InvalidGitReferenceError
+    engine = RepositoryEvolutionEngine(repo_root=".")
+    import pytest
+    with pytest.raises(InvalidGitReferenceError):
+        engine.resolve_git_diff(base_ref="nonexistent_git_branch_xyz_12345")
+
+
+def test_transitive_blast_radius_api_field_consistency():
+    """10. API endpoint /api/evolution/analyze returns consistent direct and indirect impact fields."""
+    from fastapi.testclient import TestClient
+
+    from testpilot.web.api import app
+
+    client = TestClient(app)
+    resp = client.post(
+        "/api/evolution/analyze",
+        json={"base_ref": "HEAD~1", "target_ref": "HEAD", "max_depth": 3, "repo_path": "."},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert "direct_impacts" in data
+    assert "indirect_impacts" in data
+    assert "total_impacted_symbols" in data
+    assert isinstance(data["direct_impacts"], list)
+    assert isinstance(data["indirect_impacts"], list)
+    assert data["total_impacted_symbols"] == len(data["direct_impacts"]) + len(data["indirect_impacts"])
+
+    for node in data["direct_impacts"]:
+        assert node["depth"] == 1
+        assert node["impact_type"] in ("DIRECT", "EVENT_REGISTRATION")
+        assert "evidence" in node
+        assert "resolution_engine" in node["evidence"]
+        assert "evidence_source" in node["evidence"]
+
+    for node in data["indirect_impacts"]:
+        assert node["depth"] >= 2
+        assert node["impact_type"] == "INDIRECT"
+        assert "evidence" in node
+        assert len(node["evidence"]["call_chain"]) >= 2

@@ -237,15 +237,15 @@ def test_api_evaluation_overview_endpoint():
     assert configs["Naive Baseline"]["status"] == "Evaluated"
     assert configs["TestPilot"]["status"] == "Evaluated"
 
-    assert configs["TestPilot + Sourcegraph"]["status"] == "Not evaluated yet"
+    assert configs["TestPilot + Sourcegraph"]["status"] == "Not Evaluated / Pending"
     assert configs["TestPilot + Sourcegraph"]["precision"] is None
     assert configs["TestPilot + Sourcegraph"]["precision_display"] == "—"
 
-    assert configs["TestPilot + Repository RAG"]["status"] == "Not evaluated yet"
-    assert configs["TestPilot + Repository RAG"]["precision"] is None
-    assert configs["TestPilot + Repository RAG"]["f1_display"] == "—"
+    assert configs["TestPilot + Repository RAG"]["status"] == "Evaluated"
+    assert configs["TestPilot + Repository RAG"]["precision"] == 0.3333
+    assert configs["TestPilot + Repository RAG"]["f1_display"] == "46.15%"
 
-    assert configs["TestPilot + Sourcegraph + Repository RAG"]["status"] == "Not evaluated yet"
+    assert configs["TestPilot + Sourcegraph + Repository RAG"]["status"] == "Not Evaluated / Pending"
     assert configs["TestPilot + Sourcegraph + Repository RAG"]["test_reduction_display"] == "—"
 
     # Status cards
@@ -259,7 +259,7 @@ def test_api_evaluation_overview_endpoint():
     # Methodology & Evidence
     assert "methodology" in data
     assert "research_evidence" in data
-    assert data["research_evidence"]["rag_evaluated"] is False
+    assert data["research_evidence"]["rag_evaluated"] is True
 
 
 def test_api_evaluation_page_html_renders():

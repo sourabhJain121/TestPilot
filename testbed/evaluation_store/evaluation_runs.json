@@ -190,6 +190,41 @@
         "total_tests": 133,
         "latency_ms": 2047.73,
         "notes": "Evidence-grounded selection using qualified symbol identity, receiver resolution, and caller graph."
+      },
+      "testpilot_rag": {
+        "baseline_type": "testpilot_rag",
+        "name": "TestPilot + Repository RAG",
+        "selected_tests": [
+          "tests/generated/test_order_service.py::test_empty_cart",
+          "tests/generated/test_order_service.py::test_invalid_coupon",
+          "tests/generated/test_order_service.py::test_subtotal_above_free_shipping_threshold",
+          "tests/generated/test_order_service.py::test_subtotal_at_free_shipping_threshold",
+          "tests/generated/test_order_service.py::test_subtotal_below_free_shipping_threshold",
+          "tests/generated/test_order_service.py::test_valid_coupon",
+          "tests/test_testbed_api.py::test_bug_1_discount_deficit_negative_total"
+        ],
+        "selected_count": 7,
+        "total_tests": 133,
+        "latency_ms": 66169.48,
+        "notes": "Semantic AST vector retrieval & CodeLlama validation with deterministic recall protection."
+      },
+      "testpilot_sourcegraph": {
+        "baseline_type": "testpilot_sourcegraph",
+        "name": "TestPilot + Sourcegraph",
+        "selected_tests": [],
+        "selected_count": 0,
+        "total_tests": 133,
+        "latency_ms": 0.0,
+        "notes": "Sourcegraph quantitative evaluation could not be performed because Sourcegraph was unavailable (port 7080 authentication required)."
+      },
+      "testpilot_sg_rag": {
+        "baseline_type": "testpilot_sg_rag",
+        "name": "TestPilot + Sourcegraph + Repository RAG",
+        "selected_tests": [],
+        "selected_count": 0,
+        "total_tests": 133,
+        "latency_ms": 0.0,
+        "notes": "Combined evaluation blocked because Sourcegraph was unavailable (port 7080 authentication required)."
       }
     },
     "metrics": {
@@ -237,6 +272,51 @@
         "total_latency_ms": 2104.35,
         "is_evaluated": true,
         "notes": ""
+      },
+      "testpilot_rag": {
+        "tp": 7,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "test_reduction_pct": 94.74,
+        "latency_ms": 66169.48,
+        "evolution_latency_ms": 0.02,
+        "selection_latency_ms": 66169.48,
+        "total_latency_ms": 66169.48,
+        "is_evaluated": true,
+        "notes": "Evaluated with CodeLlama:7b and RepoCodeVectorStore ChromaDB."
+      },
+      "testpilot_sourcegraph": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "test_reduction_pct": null,
+        "latency_ms": 0.0,
+        "evolution_latency_ms": 0.0,
+        "selection_latency_ms": 0.0,
+        "total_latency_ms": 0.0,
+        "is_evaluated": false,
+        "notes": "Sourcegraph quantitative evaluation could not be performed because Sourcegraph was unavailable."
+      },
+      "testpilot_sg_rag": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "test_reduction_pct": null,
+        "latency_ms": 0.0,
+        "evolution_latency_ms": 0.0,
+        "selection_latency_ms": 0.0,
+        "total_latency_ms": 0.0,
+        "is_evaluated": false,
+        "notes": "Combined evaluation blocked because Sourcegraph was unavailable."
       }
     },
     "evidence_records": [
@@ -800,6 +880,33 @@
         "total_tests": 375,
         "latency_ms": 338.01,
         "notes": "Evidence-grounded selection using qualified symbol identity, receiver resolution, and caller graph."
+      },
+      "testpilot_rag": {
+        "baseline_type": "testpilot_rag",
+        "name": "TestPilot + Repository RAG",
+        "selected_tests": [],
+        "selected_count": 0,
+        "total_tests": 375,
+        "latency_ms": 3.5,
+        "notes": "Semantic AST vector retrieval & CodeLlama validation with deterministic recall protection."
+      },
+      "testpilot_sourcegraph": {
+        "baseline_type": "testpilot_sourcegraph",
+        "name": "TestPilot + Sourcegraph",
+        "selected_tests": [],
+        "selected_count": 0,
+        "total_tests": 375,
+        "latency_ms": 0.0,
+        "notes": "Sourcegraph quantitative evaluation could not be performed because Sourcegraph was unavailable (port 7080 authentication required)."
+      },
+      "testpilot_sg_rag": {
+        "baseline_type": "testpilot_sg_rag",
+        "name": "TestPilot + Sourcegraph + Repository RAG",
+        "selected_tests": [],
+        "selected_count": 0,
+        "total_tests": 375,
+        "latency_ms": 0.0,
+        "notes": "Combined evaluation blocked because Sourcegraph was unavailable (port 7080 authentication required)."
       }
     },
     "metrics": {
@@ -847,6 +954,51 @@
         "total_latency_ms": 489.36,
         "is_evaluated": true,
         "notes": ""
+      },
+      "testpilot_rag": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 5,
+        "precision": null,
+        "recall": 0.0,
+        "f1": null,
+        "test_reduction_pct": 100.0,
+        "latency_ms": 3.5,
+        "evolution_latency_ms": 0.02,
+        "selection_latency_ms": 3.5,
+        "total_latency_ms": 3.5,
+        "is_evaluated": true,
+        "notes": "Evaluated with CodeLlama:7b and RepoCodeVectorStore ChromaDB."
+      },
+      "testpilot_sourcegraph": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "test_reduction_pct": null,
+        "latency_ms": 0.0,
+        "evolution_latency_ms": 0.0,
+        "selection_latency_ms": 0.0,
+        "total_latency_ms": 0.0,
+        "is_evaluated": false,
+        "notes": "Sourcegraph quantitative evaluation could not be performed because Sourcegraph was unavailable."
+      },
+      "testpilot_sg_rag": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "test_reduction_pct": null,
+        "latency_ms": 0.0,
+        "evolution_latency_ms": 0.0,
+        "selection_latency_ms": 0.0,
+        "total_latency_ms": 0.0,
+        "is_evaluated": false,
+        "notes": "Combined evaluation blocked because Sourcegraph was unavailable."
       }
     },
     "evidence_records": [],
@@ -3283,6 +3435,33 @@
         "total_tests": 48462,
         "latency_ms": 31254.23,
         "notes": "Evidence-grounded selection using qualified symbol identity, receiver resolution, and caller graph."
+      },
+      "testpilot_rag": {
+        "baseline_type": "testpilot_rag",
+        "name": "TestPilot + Repository RAG",
+        "selected_tests": [],
+        "selected_count": 0,
+        "total_tests": 48462,
+        "latency_ms": 2.0,
+        "notes": "Semantic AST vector retrieval & CodeLlama validation with deterministic recall protection."
+      },
+      "testpilot_sourcegraph": {
+        "baseline_type": "testpilot_sourcegraph",
+        "name": "TestPilot + Sourcegraph",
+        "selected_tests": [],
+        "selected_count": 0,
+        "total_tests": 48462,
+        "latency_ms": 0.0,
+        "notes": "Sourcegraph quantitative evaluation could not be performed because Sourcegraph was unavailable (port 7080 authentication required)."
+      },
+      "testpilot_sg_rag": {
+        "baseline_type": "testpilot_sg_rag",
+        "name": "TestPilot + Sourcegraph + Repository RAG",
+        "selected_tests": [],
+        "selected_count": 0,
+        "total_tests": 48462,
+        "latency_ms": 0.0,
+        "notes": "Combined evaluation blocked because Sourcegraph was unavailable (port 7080 authentication required)."
       }
     },
     "metrics": {
@@ -3330,6 +3509,51 @@
         "total_latency_ms": 44333.06,
         "is_evaluated": true,
         "notes": ""
+      },
+      "testpilot_rag": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "test_reduction_pct": 100.0,
+        "latency_ms": 2.0,
+        "evolution_latency_ms": 0.02,
+        "selection_latency_ms": 2.0,
+        "total_latency_ms": 2.0,
+        "is_evaluated": true,
+        "notes": "Evaluated with CodeLlama:7b and RepoCodeVectorStore ChromaDB."
+      },
+      "testpilot_sourcegraph": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "test_reduction_pct": null,
+        "latency_ms": 0.0,
+        "evolution_latency_ms": 0.0,
+        "selection_latency_ms": 0.0,
+        "total_latency_ms": 0.0,
+        "is_evaluated": false,
+        "notes": "Sourcegraph quantitative evaluation could not be performed because Sourcegraph was unavailable."
+      },
+      "testpilot_sg_rag": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "test_reduction_pct": null,
+        "latency_ms": 0.0,
+        "evolution_latency_ms": 0.0,
+        "selection_latency_ms": 0.0,
+        "total_latency_ms": 0.0,
+        "is_evaluated": false,
+        "notes": "Combined evaluation blocked because Sourcegraph was unavailable."
       }
     },
     "evidence_records": [],
@@ -13740,6 +13964,72 @@
         "total_tests": 10205,
         "latency_ms": 5394.67,
         "notes": "Evidence-grounded selection using qualified symbol identity, receiver resolution, and caller graph."
+      },
+      "testpilot_rag": {
+        "baseline_type": "testpilot_rag",
+        "name": "TestPilot + Repository RAG",
+        "selected_tests": [
+          "tests/auth_tests/test_management.py::PermissionRenameOperationsTests::test_permission_rename_chain",
+          "tests/auth_tests/test_management.py::PermissionRenameOperationsTests::test_permission_rename_chain_to_zero_uninterrupted",
+          "tests/auth_tests/test_management.py::PermissionRenameOperationsTests::test_permission_rename_duplicate_codename_across_content_types",
+          "tests/auth_tests/test_management.py::PermissionRenameOperationsTests::test_permission_rename_respects_other_db",
+          "tests/auth_tests/test_management.py::PermissionRenameOperationsTests::test_rename_backward_without_permissions",
+          "tests/auth_tests/test_management.py::PermissionRenameOperationsTests::test_rename_permission_conflict",
+          "tests/auth_tests/test_management.py::PermissionRenameOperationsTests::test_rename_skipped_if_router_disallows",
+          "tests/auth_tests/test_management.py::PermissionRenameOperationsTests::test_verbosity_prints",
+          "tests/contenttypes_tests/test_operations.py::ContentTypeOperationsTests::test_existing_content_type_rename_other_database",
+          "tests/migrate_signals/tests.py::MigrateSignalTests::test_migrations_only",
+          "tests/migrations/test_commands.py::AppLabelErrorTests::test_migrate_app_name_specified_as_label",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_check",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_fake_initial_case_insensitive",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_forward_to_squashed_migration",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_inconsistent_history",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_initial_false",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_partially_applied_squashed_migration",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_plan",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_prune",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_record_replaced",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_runs_database_system_checks",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_syncdb_app_label",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_syncdb_deferred_sql",
+          "tests/migrations/test_commands.py::MigrateTests::test_migrate_with_system_checks",
+          "tests/migrations/test_commands.py::MigrateTests::test_migration_name_specified_as_label",
+          "tests/migrations/test_commands.py::MigrateTests::test_regression_22823_applied_squashed_migration",
+          "tests/migrations/test_commands.py::MigrateTests::test_showmigrations_list",
+          "tests/migrations/test_commands.py::MigrateTests::test_showmigrations_plan",
+          "tests/migrations/test_commands.py::MigrateTests::test_showmigrations_unapplied_squashed_migration",
+          "tests/migrations/test_commands.py::MigrateTests::test_sqlmigrate_backwards",
+          "tests/migrations/test_commands.py::MigrateTests::test_sqlmigrate_forwards",
+          "tests/migrations/test_commands.py::MigrateTests::test_squashed_migration_partially_applied",
+          "tests/migrations/test_commands.py::MigrateTests::test_squashed_name_specified_as_label",
+          "tests/migrations/test_commands.py::MigrateTests::test_unapplied_squashed_migration",
+          "tests/migrations/test_commands.py::MigrateTests::test_unknown_prefix",
+          "tests/migrations/test_operations.py::OperationTests::test_create_model",
+          "tests/migrations/test_operations.py::OperationTests::test_rename_model"
+        ],
+        "selected_count": 38,
+        "total_tests": 10205,
+        "latency_ms": 797810.0,
+        "notes": "Semantic AST vector retrieval & CodeLlama validation with deterministic recall protection."
+      },
+      "testpilot_sourcegraph": {
+        "baseline_type": "testpilot_sourcegraph",
+        "name": "TestPilot + Sourcegraph",
+        "selected_tests": [],
+        "selected_count": 0,
+        "total_tests": 10205,
+        "latency_ms": 0.0,
+        "notes": "Sourcegraph quantitative evaluation could not be performed because Sourcegraph was unavailable (port 7080 authentication required)."
+      },
+      "testpilot_sg_rag": {
+        "baseline_type": "testpilot_sg_rag",
+        "name": "TestPilot + Sourcegraph + Repository RAG",
+        "selected_tests": [],
+        "selected_count": 0,
+        "total_tests": 10205,
+        "latency_ms": 0.0,
+        "notes": "Combined evaluation blocked because Sourcegraph was unavailable (port 7080 authentication required)."
       }
     },
     "metrics": {
@@ -13787,6 +14077,51 @@
         "total_latency_ms": 10169.83,
         "is_evaluated": true,
         "notes": ""
+      },
+      "testpilot_rag": {
+        "tp": 8,
+        "fp": 30,
+        "fn": 0,
+        "precision": 0.2105,
+        "recall": 1.0,
+        "f1": 0.3478,
+        "test_reduction_pct": 99.63,
+        "latency_ms": 797810.0,
+        "evolution_latency_ms": 134.8,
+        "selection_latency_ms": 797810.0,
+        "total_latency_ms": 797810.0,
+        "is_evaluated": true,
+        "notes": "Evaluated with CodeLlama:7b and RepoCodeVectorStore ChromaDB."
+      },
+      "testpilot_sourcegraph": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "test_reduction_pct": null,
+        "latency_ms": 0.0,
+        "evolution_latency_ms": 0.0,
+        "selection_latency_ms": 0.0,
+        "total_latency_ms": 0.0,
+        "is_evaluated": false,
+        "notes": "Sourcegraph quantitative evaluation could not be performed because Sourcegraph was unavailable."
+      },
+      "testpilot_sg_rag": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "test_reduction_pct": null,
+        "latency_ms": 0.0,
+        "evolution_latency_ms": 0.0,
+        "selection_latency_ms": 0.0,
+        "total_latency_ms": 0.0,
+        "is_evaluated": false,
+        "notes": "Combined evaluation blocked because Sourcegraph was unavailable."
       }
     },
     "evidence_records": [

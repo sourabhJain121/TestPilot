@@ -60,37 +60,49 @@ TestPilot solves this by combining **deterministic repository evidence** (Git di
 
 ---
 
-## 5. System Architecture & Operational Workflow
+## 5. System Architecture & Unified End-to-End Operational Workflow
 
-The system enforces a clean 6-stage operational pipeline:
+TestPilot provides a single, coherent end-to-end repository workflow where you select and analyze a repository once (such as Pallets Flask, Django, or Local Testbed), and all downstream stages operate strictly on that **same repository and analysis context**.
 
 ```
-[Stage 0: Repository Intelligence]
-   Git Diff (base..target) ──> AST / Tree-sitter ──> SymbolId ──> Transitive Impact Graph
+[Stage 0: Repository Evolution Intelligence]
+   Git Diff (base..target) ──> AST Syntax Parsing ──> SymbolId ──> Transitive Blast Radius
+         │  (Initializes ActiveAnalysisContext with unique analysis_id)
+         ▼
+[Stage 1: Specification & Boundaries]
+   Honest Spec Detection: OpenAPI 3.1 (if available) OR AST Source Decision Boundaries (if no spec)
+         │  (Consumes primary_target_file & primary_target_symbol from active context)
+         ▼
+[Stage 2: Deterministic Boundary Matrix]
+   Synthesizes edge cases & bounds (Evidence: OpenAPI vs AST Source Code Boundaries — Zero Hallucination)
          │
          ▼
-[Stage 1: Impact Analysis]
-   Sourcegraph Intelligence ──> [Optional] Repository RAG ──> [Optional] CodeLlama Validation
+[Stage 3: Impact Analysis & Code Intelligence]
+   Upstream caller hierarchy & dependency traversal on active repository symbols
          │
          ▼
-[Stage 2: Deterministic Matrix]
-   OpenAPI 3.1 Contract Parsing ──> Boundary Constraint Synthesis (no LLM hallucination)
+[Stage 4: Test Generation & Execution]
+   Prioritized regression suite execution (nested subprocess protected by TESTPILOT_PIPELINE_DEPTH)
          │
          ▼
-[Stage 3: Generate Tests]
-   Qwen2.5-Coder Synthesis grounded in deterministic boundary cases
-         │
-         ▼
-[Stage 4: Execute Tests]
-   Prioritized Regression Execution (nested subprocess protected by TESTPILOT_PIPELINE_DEPTH)
-         │
-         ▼
-[Stage 5: Failure Arbitration]
-   Spec-as-Oracle Three-Valued Classification (True Defect vs Invalid Test vs Spec Ambiguity)
+[Stage 5: Spec-as-Oracle Failure Arbitration]
+   Multi-source evidence fusion: Three-valued classification (True Defect vs Invalid Test vs Spec Ambiguity)
          │
          ▼
 [Stage 6: Pipeline Complete] ✓
 ```
+
+### Key Workflow Architectural Principles:
+1. **Single Source of Truth (`ActiveAnalysisContext`)**:
+   - Repository Evolution establishes the active analysis context (`/api/analysis/context`), generating a unique `analysis_id` (`#run-YYYYMMDD-xxxxxx`), resolving the human-readable repository name, detecting OpenAPI specification availability, and isolating the primary target file and symbols.
+2. **Deterministic Context Propagation**:
+   - Downstream stages (AST extraction, Deterministic Matrix, Impact Analysis, Failure Arbitration) read directly from the active analysis context. They **never silently revert** to hardcoded testbed files (e.g. `order_service.py`) when analyzing external repositories like Flask or Django.
+3. **Honest Specification Policy**:
+   - Repositories without OpenAPI definitions (such as Flask or Django) explicitly declare: `Specification: Not available for this repository` with zero-hallucination messaging (*"Repository-level boundary analysis can continue using available source-code evidence."*). Deterministic boundary synthesis safely extracts branch boundary conditions from AST source code without inventing nonexistent OpenAPI routes.
+4. **Persistent Active Context Bar & Navigation**:
+   - A dedicated banner remains visible across all workflow panels showing the Active Repository, Target File & Symbol, Spec Status, and Run ID, with one-click "Next →" transitions and a "Reset / New Analysis" controller.
+5. **Safe External Execution**:
+   - External repositories without required host dependencies are safely handled with explicit environment limitation reporting rather than injecting fake testbed passes.
 
 *Note: Evaluation and Autonomous Remediation are separate standalone modules and do NOT intrude into the operational workflow.*
 
@@ -106,7 +118,7 @@ The system enforces a clean 6-stage operational pipeline:
 - **Explainable Test Prioritization**: Ranks candidate regression tests into `CRITICAL`, `HIGH`, `MEDIUM`, and `LOW` tiers with token-boundary matching and structured evidence trails.
 
 ### B. Sourcegraph Code Intelligence (CORE / FALLBACK SAFE)
-- **Client**: Queries Sourcegraph GraphQL endpoint (`http://localhost:3080/.api/graphql`) or remote instance.
+- **Client**: Queries Sourcegraph GraphQL endpoint (`http://localhost:7080/.api/graphql`) or remote instance.
 - **Capabilities**:
   - `find_definitions(symbol)`: Symbol definition locations.
   - `find_references(symbol)`: Call sites and usages.
@@ -182,7 +194,7 @@ The evaluation harness benchmark evaluates test selection approaches against gro
   ollama pull qwen2.5-coder:7b
   ollama pull codellama:7b
   ```
-- (Optional) [Sourcegraph](https://sourcegraph.com): Local Docker container on port 3080 or remote instance.
+- (Optional) [Sourcegraph](https://sourcegraph.com): Local Docker container on port 7080 or remote instance.
 
 ### Setup
 ```bash
@@ -257,14 +269,44 @@ Open [http://localhost:8000](http://localhost:8000) in your browser.
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
+| **System** |||
 | `GET` | `/api/status` | System health check (Ollama, Sourcegraph, ChromaDB, Python) |
+| `POST` | `/api/settings/model` | Switch active LLM model |
+| **Pipeline** |||
 | `POST` | `/api/pipeline/run` | Execute 6-stage autonomous pipeline (supports `enable_semantic_validation`) |
 | `POST` | `/api/evolution/analyze` | Repository evolution intelligence & blast radius analysis |
-| `GET` | `/api/sourcegraph/search` | Query definitions, references, test references, and functions |
+| `GET` | `/api/evolution/refs` | Query symbol references via evolution engine |
+| `POST` | `/api/ast/parse-diff` | Parse git diff and extract AST-level changes |
+| **Code Intelligence** |||
+| `GET` | `/api/code-intel/status` | Sourcegraph / local fallback connection status |
+| `GET` | `/api/code-intel/search` | Unified code search (definitions, references, tests, functions) |
+| `GET` | `/api/code-intel/callers` | Find callers of a symbol |
+| `GET` | `/api/code-intel/source` | Retrieve source code for a file |
+| `GET` | `/api/sourcegraph/definitions` | Symbol definition locations |
+| `GET` | `/api/sourcegraph/references` | Symbol reference / call sites |
+| `GET` | `/api/sourcegraph/tests` | Test files referencing a symbol |
+| `GET` | `/api/sourcegraph/class-usages` | Class instantiations and subclasses |
+| **RAG & Test Generation** |||
 | `POST` | `/api/rag/index` | Index repository semantic code units into ChromaDB |
 | `POST` | `/api/rag/query` | Retrieve code context from `repo_code_store` |
+| `POST` | `/api/testgen/deterministic` | Generate deterministic boundary tests from OpenAPI spec |
+| `POST` | `/api/verify` | Execute generated tests and classify failures |
+| **Evaluation** |||
 | `GET` | `/api/evaluation/overview` | Pooled benchmark metrics and baseline comparisons |
+| `GET` | `/api/evaluation/benchmarks` | List all benchmark cases |
+| `GET` | `/api/evaluation/benchmarks/{case_id}` | Get a specific benchmark case |
+| `GET` | `/api/evaluation/components` | Component-level evaluation metrics |
+| `GET` | `/api/evaluation/failure-analysis` | Failure classification analysis |
 | `POST` | `/api/evaluation/run` | Execute benchmark case evaluation |
+| **Remediation & Guardrails** |||
+| `POST` | `/api/remediate` | Autonomous patch synthesis for failing tests |
+| `POST` | `/api/guardrails/check` | Safety guardrail check on generated code |
+| `GET` | `/api/guardrails/audit` | Audit log of guardrail checks |
+| **Repository** |||
+| `POST` | `/api/repo/load` | Load external repository for analysis |
+| `POST` | `/api/repo/zero-clone-testgen` | Zero-clone test generation for external repos |
+| `POST` | `/api/report/export` | Export analysis report |
+| `GET` | `/api/benchmark` | Benchmark data endpoint |
 
 ---
 
@@ -304,6 +346,7 @@ Open [http://localhost:8000](http://localhost:8000) in your browser.
 TestPilot/
 ├── testpilot/
 │   ├── ast_engine/          # Tree-sitter & AST diff parsers
+│   ├── benchmark/           # Benchmark runners & evaluators
 │   ├── core/
 │   │   ├── models.py        # Core request/response schemas
 │   │   └── pipeline.py      # FullPipelineOrchestrator & recursion protection
@@ -315,6 +358,7 @@ TestPilot/
 │   │   ├── engine.py        # EvaluationEngine & metric computation
 │   │   ├── models.py        # BenchmarkCase, GroundTruth, EvaluationRun
 │   │   └── storage.py       # Persistence for benchmark cases and runs
+│   ├── generator/           # Test synthesis & code generation
 │   ├── guardrails/          # SafetyGuardrailEngine & AST code sanitizer
 │   ├── llm/
 │   │   ├── client.py        # OllamaLLMClient
