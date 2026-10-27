@@ -224,39 +224,30 @@ def test_ui_html_sections_and_placement():
     assert 'id="quantitative-comparison-section"' in content
     assert "Quantitative Comparison" in content
 
-    # Verify presence of Qualitative Analysis section
-    assert 'id="qualitative-analysis-section"' in content
-    assert "Qualitative Analysis Findings" in content
+    # Verify Qualitative Analysis section is completely removed from frontend
+    assert 'id="qualitative-analysis-section"' not in content
+    assert "Qualitative Analysis Findings" not in content
 
-    # Verify presence of Quantitative Matrix reference section
-    assert 'id="quantitative-matrix-section"' in content
-    assert "Quantitative Analysis" in content
-    assert "30-Question Matrix" in content
+    # Verify Quantitative Matrix section and 30-Question Matrix are completely removed from frontend
+    assert 'id="quantitative-matrix-section"' not in content
+    assert "30-Question Matrix" not in content
 
-    # Verify modal is present
-    assert 'id="modal-quantitative-questions"' in content
+    # Verify modal is removed
+    assert 'id="modal-quantitative-questions"' not in content
 
-    # Verify exact ordering:
-    # 1. Quantitative Comparison (Section 4)
-    # 2. Qualitative Analysis Findings (Section 4b)
-    # 3. Quantitative Analysis — 30-Question Matrix Reference (Section 4c)
+    # Verify Qualitative & Quantitative Matrix JS functions are completely removed from frontend
+    assert "fetchQualitativeFindings" not in content
+    assert "renderQualitativeFindings" not in content
+    assert "populateQualitativeRepoFilter" not in content
+    assert "openQuantitativeMatrixModal" not in content
+    assert "closeQuantitativeMatrixModal" not in content
+
+    # Verify that Evaluation & Ablation Plan follows Quantitative Comparison directly
     pos_quant_comp = content.find('id="quantitative-comparison-section"')
-    pos_qual_findings = content.find('id="qualitative-analysis-section"')
-    pos_quant_matrix = content.find('id="quantitative-matrix-section"')
+    pos_ablation = content.find("Evaluation & Ablation Plan")
 
     assert pos_quant_comp != -1, "Quantitative Comparison section not found"
-    assert pos_qual_findings != -1, "Qualitative Analysis Findings section not found"
-    assert pos_quant_matrix != -1, "Quantitative Matrix Reference section not found"
-
-    assert pos_quant_comp < pos_qual_findings, (
-        "Qualitative Analysis Findings must be placed immediately after Quantitative Comparison"
+    assert pos_ablation != -1, "Evaluation & Ablation Plan section not found"
+    assert pos_quant_comp < pos_ablation, (
+        "Evaluation & Ablation Plan must follow Quantitative Comparison"
     )
-    assert pos_qual_findings < pos_quant_matrix, (
-        "Quantitative Matrix reference must be placed immediately after Qualitative Analysis Findings"
-    )
-
-    # Verify JS functions exist
-    assert "fetchQualitativeFindings" in content
-    assert "renderQualitativeFindings" in content
-    assert "openQuantitativeMatrixModal" in content
-    assert "closeQuantitativeMatrixModal" in content

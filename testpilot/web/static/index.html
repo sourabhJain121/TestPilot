@@ -202,6 +202,12 @@
         <i data-lucide="git-pull-request" class="w-4 h-4 text-purple-400"></i>
         <span>Repository Evolution</span>
       </button>
+      <button onclick="switchTab('ast')" id="tab-btn-ast"
+        class="tab-btn hidden items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-850 transition shrink-0"
+        title="AST Analysis">
+        <i data-lucide="code" class="w-4 h-4 text-emerald-400"></i>
+        <span>AST Analysis</span>
+      </button>
       <button onclick="switchTab('blast')" id="tab-btn-blast"
         class="tab-btn flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-850 transition shrink-0"
         title="Stage 1: Multi-Layer Impact Analysis">
@@ -345,8 +351,7 @@
             <div>
               <div class="font-mono text-[11px] text-purple-400 font-bold mb-1">STAGE 0</div>
               <p class="text-slate-300 font-medium">Repository Evolution</p>
-              <p class="text-[11px] text-slate-500 mt-1">Git diff, AST/Tree-sitter, Sourcegraph, qualified symbol
-                identity, changed symbols, caller analysis, and regression test prioritization.</p>
+              <p class="text-[11px] text-slate-500 mt-1">Git diff, AST symbol identity, changed symbols, file classification, and commit references.</p>
             </div>
             <button onclick="switchTab('evolution')"
               class="text-purple-400 hover:text-purple-300 font-medium text-[11px] flex items-center space-x-1">
@@ -354,25 +359,11 @@
             </button>
           </div>
 
-          <div class="p-4 rounded-xl bg-slate-950 border border-cyan-800/50 flex flex-col justify-between space-y-2">
-            <div>
-              <div class="font-mono text-[11px] text-cyan-400 font-bold mb-1">STAGE 1</div>
-              <p class="text-slate-300 font-medium">Specification & Boundaries</p>
-              <p class="text-[11px] text-slate-500 mt-1">OpenAPI formal constraints, PRD specification grounding, AST
-                boundary extraction, and deterministic schema bounds.</p>
-            </div>
-            <button onclick="switchTab('ast')"
-              class="text-cyan-400 hover:text-cyan-300 font-medium text-[11px] flex items-center space-x-1">
-              <span>Inspect Spec & Boundaries &rarr;</span>
-            </button>
-          </div>
-
           <div class="p-4 rounded-xl bg-slate-950 border border-indigo-800/50 flex flex-col justify-between space-y-2">
             <div>
-              <div class="font-mono text-[11px] text-indigo-400 font-bold mb-1">STAGE 2</div>
+              <div class="font-mono text-[11px] text-indigo-400 font-bold mb-1">STAGE 1</div>
               <p class="text-slate-300 font-medium">Impact Analysis</p>
-              <p class="text-[11px] text-slate-500 mt-1">Blast radius calculation, upstream caller hierarchy resolution,
-                and dependency graph traversal across services.</p>
+              <p class="text-[11px] text-slate-500 mt-1">Blast radius calculation, upstream caller hierarchy resolution, and boundary impact traversal.</p>
             </div>
             <button onclick="switchTab('blast')"
               class="text-indigo-400 hover:text-indigo-300 font-medium text-[11px] flex items-center space-x-1">
@@ -380,12 +371,35 @@
             </button>
           </div>
 
+          <div class="p-4 rounded-xl bg-slate-950 border border-emerald-800/50 flex flex-col justify-between space-y-2">
+            <div>
+              <div class="font-mono text-[11px] text-emerald-400 font-bold mb-1">STAGE 2</div>
+              <p class="text-slate-300 font-medium">Intelligent Selection</p>
+              <p class="text-[11px] text-slate-500 mt-1">Direct AST & transitive test selection, suite reduction %, and 5-criterion targeted test generation.</p>
+            </div>
+            <button onclick="switchTab('selection')"
+              class="text-emerald-400 hover:text-emerald-300 font-medium text-[11px] flex items-center space-x-1">
+              <span>Inspect Selection &rarr;</span>
+            </button>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-950 border border-blue-800/50 flex flex-col justify-between space-y-2">
+            <div>
+              <div class="font-mono text-[11px] text-blue-400 font-bold mb-1">STAGE 3</div>
+              <p class="text-slate-300 font-medium">Isolated Execution</p>
+              <p class="text-[11px] text-slate-500 mt-1">Disposable Docker container sandbox, read-only mounts, and isolated non-root pytest execution.</p>
+            </div>
+            <button onclick="switchTab('execution')"
+              class="text-blue-400 hover:text-blue-300 font-medium text-[11px] flex items-center space-x-1">
+              <span>View Container Run &rarr;</span>
+            </button>
+          </div>
+
           <div class="p-4 rounded-xl bg-slate-950 border border-rose-800/50 flex flex-col justify-between space-y-2">
             <div>
-              <div class="font-mono text-[11px] text-rose-400 font-bold mb-1">STAGE 3</div>
+              <div class="font-mono text-[11px] text-rose-400 font-bold mb-1">STAGE 4</div>
               <p class="text-slate-300 font-medium">Failure Arbitration</p>
-              <p class="text-[11px] text-slate-500 mt-1">Multi-source evidence fusion: code, test, and specification
-                evidence triaged into 3-valued verdicts.</p>
+              <p class="text-[11px] text-slate-500 mt-1">Multi-source evidence fusion: regressions, pre-existing failures, flaky tests, and test defects.</p>
             </div>
             <button onclick="switchTab('arbiter')"
               class="text-rose-400 hover:text-rose-300 font-medium text-[11px] flex items-center space-x-1">
@@ -393,24 +407,169 @@
             </button>
           </div>
 
-          <div
-            class="p-4 rounded-xl bg-slate-950 border border-slate-800/80 flex flex-col justify-between space-y-2 opacity-80">
-            <div>
-              <div class="flex items-center space-x-1.5 mb-1">
-                <span class="font-mono text-[11px] text-slate-400 font-bold">STAGE 4</span>
-                <span class="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-amber-300 font-mono">OPTIONAL
-                  EXTENSION</span>
-              </div>
-              <p class="text-slate-400 font-medium">Experimental Remediation</p>
-              <p class="text-[11px] text-slate-500 mt-1">Optional ongoing research extension: candidate patch synthesis
-                and ephemeral pytest sandbox verification.</p>
+        </div>
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- ACTIVE PIPELINE RUN & REGRESSION DECISION CENTER (5 CORE QUESTIONS)     -->
+      <!-- ===================================================================== -->
+      <div id="overview-active-run-card" class="p-6 rounded-2xl bg-slate-900/90 border border-cyan-800/50 shadow-2xl space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">ACTIVE WORKFLOW & DECISION CENTER</span>
+              <span id="overview-workflow-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-slate-800 text-slate-300 border border-slate-700">STATUS: INITIALIZING...</span>
             </div>
-            <button onclick="switchTab('remediation')"
-              class="text-slate-400 hover:text-slate-300 font-medium text-[11px] flex items-center space-x-1">
-              <span>View Experimental &rarr;</span>
+            <h3 class="font-bold text-base text-white mt-1 flex items-center space-x-2">
+              <i data-lucide="shield-check" class="w-5 h-5 text-cyan-400"></i>
+              <span>Engineering Questions & Evidence-Grounded Verdict</span>
+            </h3>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="fetchActiveWorkflowOverview()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs border border-slate-700 transition" title="Refresh Active Workflow State">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
+            <button onclick="triggerSequentialPipeline()" id="btn-overview-run-pipeline" class="flex items-center space-x-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium text-xs shadow-md transition">
+              <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+              <span>Execute 5-Stage Pipeline</span>
             </button>
           </div>
+        </div>
 
+        <!-- The 5 Core Engineering Questions Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs font-mono">
+          <!-- Q1: What Repository & Revision -->
+          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800/60 pb-1.5">
+              <span class="text-cyan-400 font-bold">1. REPOSITORY & REVISION</span>
+              <span id="overview-dirty-indicator" class="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">CLEAN</span>
+            </div>
+            <div class="space-y-1 text-slate-300">
+              <div class="text-white font-bold truncate" id="overview-repo-name">--</div>
+              <div class="text-[10px] text-slate-500 truncate" id="overview-repo-path">--</div>
+              <div class="text-[10px] pt-1 flex items-center space-x-1 text-slate-400">
+                <span>Base:</span> <code class="text-cyan-300 bg-slate-900 px-1 py-0.5 rounded" id="overview-base-sha">--</code>
+                <span>&rarr;</span>
+                <span>Target:</span> <code class="text-yellow-300 bg-slate-900 px-1 py-0.5 rounded" id="overview-target-sha">--</code>
+              </div>
+            </div>
+          </div>
+
+          <!-- Q2: What Changed? -->
+          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800/60 pb-1.5">
+              <span class="text-yellow-400 font-bold">2. REPOSITORY EVOLUTION</span>
+              <button onclick="switchTab('evolution')" class="text-purple-400 hover:underline text-[10px]">Inspect Diff &rarr;</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-center pt-1">
+              <div class="p-2 rounded bg-slate-900/60 border border-slate-800">
+                <div class="text-[10px] text-slate-400">Files Changed</div>
+                <div id="overview-changed-files" class="text-lg font-bold text-white">0</div>
+              </div>
+              <div class="p-2 rounded bg-slate-900/60 border border-slate-800">
+                <div class="text-[10px] text-slate-400">AST Symbols</div>
+                <div id="overview-changed-symbols" class="text-lg font-bold text-yellow-400">0</div>
+              </div>
+            </div>
+            <div class="text-[10px] text-slate-400 text-center" id="overview-evo-summary">AST qualification active</div>
+          </div>
+
+          <!-- Q3: Blast Radius & Impact -->
+          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800/60 pb-1.5">
+              <span class="text-indigo-400 font-bold">3. IMPACT ANALYSIS</span>
+              <button onclick="switchTab('blast')" class="text-indigo-400 hover:underline text-[10px]">View Graph &rarr;</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-center pt-1">
+              <div class="p-2 rounded bg-slate-900/60 border border-slate-800">
+                <div class="text-[10px] text-slate-400">Direct Callers</div>
+                <div id="overview-direct-callers" class="text-lg font-bold text-indigo-300">0</div>
+              </div>
+              <div class="p-2 rounded bg-slate-900/60 border border-slate-800">
+                <div class="text-[10px] text-slate-400">Boundary Impacts</div>
+                <div id="overview-boundary-impacts" class="text-lg font-bold text-rose-400">0</div>
+              </div>
+            </div>
+            <div class="text-[10px] text-slate-400 text-center" id="overview-impact-summary">Call-graph resolution active</div>
+          </div>
+
+          <!-- Q4: Which Tests Were Selected -->
+          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800/60 pb-1.5">
+              <span class="text-emerald-400 font-bold">4. TEST SELECTION & SYNTHESIS</span>
+              <button onclick="switchTab('selection')" class="text-emerald-400 hover:underline text-[10px]">Review &rarr;</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-center pt-1">
+              <div class="p-2 rounded bg-slate-900/60 border border-slate-800">
+                <div class="text-[10px] text-slate-400">Selected Tests</div>
+                <div id="overview-selected-count" class="text-lg font-bold text-emerald-400">0</div>
+              </div>
+              <div class="p-2 rounded bg-slate-900/60 border border-slate-800">
+                <div class="text-[10px] text-slate-400">Suite Reduction</div>
+                <div id="overview-suite-reduction" class="text-lg font-bold text-cyan-400">--%</div>
+              </div>
+            </div>
+            <div class="text-[10px] text-slate-400 text-center" id="overview-selection-summary">Ranked by AST reachability</div>
+          </div>
+
+          <!-- Q5: Isolated Docker Execution -->
+          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800/60 pb-1.5">
+              <span class="text-blue-400 font-bold">5. DOCKER EXECUTION</span>
+              <button onclick="switchTab('execution')" class="text-blue-400 hover:underline text-[10px]">Logs &rarr;</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-center pt-1">
+              <div class="p-2 rounded bg-slate-900/60 border border-slate-800">
+                <div class="text-[10px] text-slate-400">Passed / Total</div>
+                <div class="text-lg font-bold text-white"><span id="overview-exec-passed" class="text-emerald-400">0</span> / <span id="overview-exec-total">0</span></div>
+              </div>
+              <div class="p-2 rounded bg-slate-900/60 border border-slate-800">
+                <div class="text-[10px] text-slate-400">Failed / Errors</div>
+                <div class="text-lg font-bold text-rose-400" id="overview-exec-failed">0</div>
+              </div>
+            </div>
+            <div class="text-[10px] text-cyan-300 text-center" id="overview-docker-status-label">Isolated Container Execution</div>
+          </div>
+
+          <!-- Q6: Failure Arbitration & Verdict -->
+          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800/60 pb-1.5">
+              <span class="text-rose-400 font-bold">6. FAILURE ARBITRATION</span>
+              <button onclick="switchTab('arbiter')" class="text-rose-400 hover:underline text-[10px]">Triage &rarr;</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-center pt-1">
+              <div class="p-2 rounded bg-slate-900/60 border border-slate-800">
+                <div class="text-[10px] text-slate-400">True Regressions</div>
+                <div id="overview-arb-regressions" class="text-lg font-bold text-rose-400">0</div>
+              </div>
+              <div class="p-2 rounded bg-slate-900/60 border border-slate-800">
+                <div class="text-[10px] text-slate-400">Pre-Existing / Flaky</div>
+                <div id="overview-arb-preexisting" class="text-lg font-bold text-slate-300">0</div>
+              </div>
+            </div>
+            <div class="text-[10px] text-slate-400 text-center" id="overview-arbitration-summary">Three-valued classification</div>
+          </div>
+        </div>
+
+        <!-- Developer Action Banner -->
+        <div id="overview-action-banner" class="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+          <div class="flex items-center space-x-3">
+            <div id="overview-action-icon" class="p-2 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800 shrink-0">
+              <i data-lucide="info" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="font-bold text-white text-sm" id="overview-action-title">Pipeline Ready for Analysis</div>
+              <div class="text-slate-400 font-sans mt-0.5" id="overview-action-description">Select an action or run the full 5-stage pipeline to analyze changes, select tests, execute in Docker, and arbitrate regressions.</div>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2 shrink-0 font-mono" id="overview-action-buttons">
+            <button onclick="switchTab('selection')" class="px-3.5 py-1.5 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs transition">
+              Inspect Tests
+            </button>
+            <button onclick="switchTab('arbiter')" class="px-3.5 py-1.5 rounded-lg bg-slate-850 hover:bg-slate-800 text-rose-300 border border-rose-900/80 text-xs transition">
+              Review Verdicts
+            </button>
+          </div>
         </div>
       </div>
 
@@ -935,6 +1094,22 @@
                 </button>
               </div>
 
+              <!-- Scope filter toggle for authoritative suite: Evaluated only vs All planned -->
+              <div id="authoritative-scope-toggle" class="inline-flex p-0.5 rounded-lg bg-slate-950 border border-slate-800 text-xs">
+                <button id="btn-scope-evaluated" onclick="setAuthoritativeMatrixFilter('evaluated')" class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800/80 cursor-pointer" title="Display strictly evaluated configurations with measured benchmark data">
+                  ✓ Evaluated Only (3)
+                </button>
+                <button id="btn-scope-all" onclick="setAuthoritativeMatrixFilter('all')" class="px-2 py-0.5 rounded text-[10px] font-mono text-slate-400 hover:text-slate-200 cursor-pointer" title="Display all planned research configurations including pending ablation baselines">
+                  All Configurations (6)
+                </button>
+              </div>
+
+              <!-- Quick search filter -->
+              <div class="relative">
+                <input id="eval-matrix-search-input" type="text" placeholder="Filter configurations..." oninput="onEvalMatrixSearchInput(this.value)" class="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg pl-7 pr-2.5 py-1 focus:outline-none focus:border-cyan-500 font-mono placeholder-slate-600 w-44">
+                <i data-lucide="search" class="w-3 h-3 text-slate-500 absolute left-2 top-2 pointer-events-none"></i>
+              </div>
+
               <!-- Repository filter dropdown for custom suite -->
               <div id="custom-suite-repo-select-container" class="hidden">
                 <select id="custom-suite-repo-select" onchange="onCustomRepoSelectChange()" class="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:border-cyan-500 font-mono">
@@ -987,17 +1162,17 @@
             <table class="w-full text-xs text-left">
               <thead class="bg-slate-950/90 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
                 <tr>
-                  <th class="px-3 py-3">Configuration</th>
-                  <th class="px-3 py-3">Status</th>
-                  <th class="px-3 py-3">Selected Tests</th>
-                  <th class="px-3 py-3">Ground Truth</th>
-                  <th class="px-3 py-3">TP</th>
-                  <th class="px-3 py-3">FP</th>
-                  <th class="px-3 py-3">FN</th>
-                  <th class="px-3 py-3">Precision</th>
-                  <th class="px-3 py-3">Recall</th>
-                  <th class="px-3 py-3">F1</th>
-                  <th class="px-3 py-3">Test Reduction</th>
+                  <th class="px-3 py-3" title="Evaluation baseline or experimental configuration">Configuration</th>
+                  <th class="px-3 py-3" title="Measured vs pending benchmark status">Status</th>
+                  <th class="px-3 py-3" title="Total test cases selected by this configuration">Selected Tests</th>
+                  <th class="px-3 py-3" title="Total ground-truth regression callers in benchmark suite">Ground Truth</th>
+                  <th class="px-3 py-3" title="True Positives: Selected tests that hit ground-truth regression callers">TP</th>
+                  <th class="px-3 py-3" title="False Positives: Selected tests that do not hit ground-truth regression callers">FP</th>
+                  <th class="px-3 py-3" title="False Negatives: Ground-truth regression callers missed by selection">FN</th>
+                  <th class="px-3 py-3" title="Precision = TP / (TP + FP) — Ratio of selected tests that are relevant">Precision</th>
+                  <th class="px-3 py-3" title="Recall = TP / (TP + FN) — Ratio of ground-truth regression callers captured">Recall</th>
+                  <th class="px-3 py-3" title="F1-Score = 2 * (Precision * Recall) / (Precision + Recall) — Harmonic mean">F1</th>
+                  <th class="px-3 py-3" title="Test Reduction = 1 - (Selected Tests / Total Benchmark Suite Tests)">Test Reduction</th>
                   <th class="px-3 py-3">Notes</th>
                 </tr>
               </thead>
@@ -1029,6 +1204,20 @@
             </span>
           </div>
 
+          <!-- Benchmark Scope & Baselines Definition Strip -->
+          <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-300 flex flex-wrap items-center justify-between gap-3 font-mono">
+            <div class="flex items-center space-x-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="text-slate-400">Evaluation Scope:</span>
+              <span class="text-slate-200 font-bold">Positive-Ground-Truth Pooled (Pallets Flask + Django + Testbed)</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-4 text-[10px] text-slate-400">
+              <span>Benchmark Volume: <strong class="text-cyan-400 font-mono">10,713 tests</strong></span>
+              <span>Ground Truth: <strong class="text-emerald-400 font-mono">20 callers</strong></span>
+              <span>Negative Control: <strong class="text-purple-400 font-mono">Home Assistant (48,462 tests, GT=0)</strong></span>
+            </div>
+          </div>
+
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <!-- Precision Card & Bars -->
             <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
@@ -1045,6 +1234,10 @@
                   <div class="w-full bg-slate-900 rounded-full h-2">
                     <div id="eval-bar-prec-testpilot" class="bg-cyan-500 h-2 rounded-full" style="width: 15.31%"></div>
                   </div>
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                    <span>TP / (TP + FP)</span>
+                    <span id="eval-counts-prec-tp" class="text-cyan-400 font-bold">15 / 98</span>
+                  </div>
                 </div>
                 <div>
                   <div class="flex justify-between text-[11px] mb-1">
@@ -1054,6 +1247,10 @@
                   <div class="w-full bg-slate-900 rounded-full h-2">
                     <div id="eval-bar-prec-naive" class="bg-amber-500 h-2 rounded-full" style="width: 11.61%"></div>
                   </div>
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                    <span>TP / (TP + FP)</span>
+                    <span id="eval-counts-prec-nv" class="text-amber-400 font-bold">13 / 112</span>
+                  </div>
                 </div>
                 <div>
                   <div class="flex justify-between text-[11px] mb-1">
@@ -1062,6 +1259,10 @@
                   </div>
                   <div class="w-full bg-slate-900 rounded-full h-2">
                     <div id="eval-bar-prec-full" class="bg-slate-600 h-2 rounded-full" style="width: 2%"></div>
+                  </div>
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                    <span>TP / (TP + FP)</span>
+                    <span id="eval-counts-prec-fr" class="text-slate-400 font-bold">20 / 8,752</span>
                   </div>
                 </div>
               </div>
@@ -1082,6 +1283,10 @@
                   <div class="w-full bg-slate-900 rounded-full h-2">
                     <div id="eval-bar-rec-full" class="bg-emerald-500 h-2 rounded-full" style="width: 100%"></div>
                   </div>
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                    <span>Captured: 20 / 20</span>
+                    <span id="eval-counts-rec-fr" class="text-emerald-400 font-bold">100% of GT</span>
+                  </div>
                 </div>
                 <div>
                   <div class="flex justify-between text-[11px] mb-1">
@@ -1091,6 +1296,10 @@
                   <div class="w-full bg-slate-900 rounded-full h-2">
                     <div id="eval-bar-rec-testpilot" class="bg-cyan-500 h-2 rounded-full" style="width: 75%"></div>
                   </div>
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                    <span>Captured: 15 / 20</span>
+                    <span id="eval-counts-rec-tp" class="text-cyan-400 font-bold">75% of GT</span>
+                  </div>
                 </div>
                 <div>
                   <div class="flex justify-between text-[11px] mb-1">
@@ -1099,6 +1308,10 @@
                   </div>
                   <div class="w-full bg-slate-900 rounded-full h-2">
                     <div id="eval-bar-rec-naive" class="bg-amber-500 h-2 rounded-full" style="width: 65%"></div>
+                  </div>
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                    <span>Captured: 13 / 20</span>
+                    <span id="eval-counts-rec-nv" class="text-amber-400 font-bold">65% of GT</span>
                   </div>
                 </div>
               </div>
@@ -1119,6 +1332,10 @@
                   <div class="w-full bg-slate-900 rounded-full h-2">
                     <div id="eval-bar-f1-testpilot" class="bg-purple-500 h-2 rounded-full" style="width: 25.43%"></div>
                   </div>
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                    <span>P: 15.31% | R: 75.00%</span>
+                    <span id="eval-counts-f1-tp" class="text-purple-400 font-bold">Harmonic Balance</span>
+                  </div>
                 </div>
                 <div>
                   <div class="flex justify-between text-[11px] mb-1">
@@ -1128,6 +1345,10 @@
                   <div class="w-full bg-slate-900 rounded-full h-2">
                     <div id="eval-bar-f1-naive" class="bg-amber-500 h-2 rounded-full" style="width: 19.70%"></div>
                   </div>
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                    <span>P: 11.61% | R: 65.00%</span>
+                    <span id="eval-counts-f1-nv" class="text-amber-400 font-bold">Harmonic Balance</span>
+                  </div>
                 </div>
                 <div>
                   <div class="flex justify-between text-[11px] mb-1">
@@ -1136,6 +1357,10 @@
                   </div>
                   <div class="w-full bg-slate-900 rounded-full h-2">
                     <div id="eval-bar-f1-full" class="bg-slate-600 h-2 rounded-full" style="width: 2%"></div>
+                  </div>
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                    <span>P: 0.23% | R: 100.0%</span>
+                    <span id="eval-counts-f1-fr" class="text-slate-400 font-bold">Low Harmonic</span>
                   </div>
                 </div>
               </div>
@@ -1156,6 +1381,10 @@
                   <div class="w-full bg-slate-900 rounded-full h-2">
                     <div id="eval-bar-red-testpilot" class="bg-yellow-500 h-2 rounded-full" style="width: 99.07%"></div>
                   </div>
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                    <span>100 / 10,713 tests</span>
+                    <span id="eval-counts-red-tp" class="text-yellow-400 font-bold">99.07% saved</span>
+                  </div>
                 </div>
                 <div>
                   <div class="flex justify-between text-[11px] mb-1">
@@ -1165,6 +1394,10 @@
                   <div class="w-full bg-slate-900 rounded-full h-2">
                     <div id="eval-bar-red-naive" class="bg-amber-500 h-2 rounded-full" style="width: 98.86%"></div>
                   </div>
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                    <span>122 / 10,713 tests</span>
+                    <span id="eval-counts-red-nv" class="text-amber-400 font-bold">98.86% saved</span>
+                  </div>
                 </div>
                 <div>
                   <div class="flex justify-between text-[11px] mb-1">
@@ -1173,6 +1406,10 @@
                   </div>
                   <div class="w-full bg-slate-900 rounded-full h-2">
                     <div id="eval-bar-red-full" class="bg-rose-500 h-2 rounded-full" style="width: 0%"></div>
+                  </div>
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                    <span>10,713 / 10,713 tests</span>
+                    <span id="eval-counts-red-fr" class="text-rose-400 font-bold">0% saved</span>
                   </div>
                 </div>
               </div>
@@ -1190,190 +1427,6 @@
               empirical regression-selection benchmarks have not yet been executed. They are tracked as <em>"Not
                 evaluated yet"</em> in the Primary Matrix and Ablation Plan.
             </span>
-          </div>
-        </div>
-
-        <!-- ========================================================================= -->
-        <!-- 4b. Qualitative Analysis Findings                                         -->
-        <!-- ========================================================================= -->
-        <div id="qualitative-analysis-section" class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 shadow-xl space-y-5">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-            <div class="space-y-1">
-              <div class="flex items-center space-x-2">
-                <span class="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                  <i data-lucide="file-search" class="w-4 h-4"></i>
-                </span>
-                <h3 class="font-bold text-base text-white">Qualitative Analysis Findings</h3>
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold uppercase tracking-wider">
-                  EVIDENCE-GROUNDED
-                </span>
-              </div>
-              <p class="text-xs text-slate-400">
-                Factual observations and empirical interpretations explaining TestPilot's behavior, architectural trade-offs, strengths, and limitations across 7 research dimensions.
-              </p>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-2.5">
-              <!-- Repository Filter Dropdown -->
-              <div class="flex items-center space-x-1.5 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs">
-                <i data-lucide="filter" class="w-3.5 h-3.5 text-cyan-400"></i>
-                <label for="qualitative-repo-filter" class="text-slate-400 text-[11px]">Scope:</label>
-                <select id="qualitative-repo-filter" onchange="fetchQualitativeFindings(this.value)" class="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer">
-                  <option value="all">All Evaluated Repositories</option>
-                  <!-- Dynamically populated with registered repositories -->
-                </select>
-              </div>
-
-              <!-- Refresh Button -->
-              <button onclick="fetchQualitativeFindings()" class="px-2.5 py-1 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs flex items-center space-x-1.5 transition cursor-pointer">
-                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                <span>Refresh Findings</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Status / Summary Badges Bar -->
-          <div class="flex flex-wrap items-center gap-2 text-xs">
-            <div class="px-3 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 flex items-center space-x-2">
-              <span class="text-slate-400">Categories:</span>
-              <span class="font-mono font-bold text-cyan-400">7 Research Dimensions</span>
-            </div>
-            <div class="px-3 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 flex items-center space-x-1.5">
-              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span class="text-slate-400">Evidence Supported:</span>
-              <span id="qualitative-badge-evidence" class="font-mono font-bold text-emerald-300">0</span>
-            </div>
-            <div class="px-3 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 flex items-center space-x-1.5">
-              <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-              <span class="text-slate-400">Preliminary:</span>
-              <span id="qualitative-badge-preliminary" class="font-mono font-bold text-amber-300">0</span>
-            </div>
-            <div class="px-3 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 flex items-center space-x-1.5">
-              <span class="w-2 h-2 rounded-full bg-slate-500"></span>
-              <span class="text-slate-400">Insufficient Evidence:</span>
-              <span id="qualitative-badge-insufficient" class="font-mono font-bold text-slate-300">0</span>
-            </div>
-          </div>
-
-          <!-- Dynamic Findings Container -->
-          <div id="qualitative-findings-container" class="space-y-4">
-            <!-- Dynamically populated via fetchQualitativeFindings -->
-            <div class="p-6 rounded-xl bg-slate-950/60 border border-slate-800 text-center text-slate-400 text-xs">
-              <i data-lucide="loader" class="w-5 h-5 animate-spin mx-auto text-cyan-400 mb-2"></i>
-              <span>Loading qualitative findings and empirical evidence...</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- ========================================================================= -->
-        <!-- 4c. Quantitative Analysis — 30-Question Matrix Reference                  -->
-        <!-- ========================================================================= -->
-        <div id="quantitative-matrix-section" class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 shadow-xl space-y-5">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-            <div class="space-y-1">
-              <div class="flex items-center space-x-2">
-                <span class="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
-                  <i data-lucide="table-properties" class="w-4 h-4"></i>
-                </span>
-                <h3 class="font-bold text-base text-white">Quantitative Analysis — 30-Question Matrix</h3>
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800 font-bold uppercase tracking-wider">
-                  RESEARCH METHODOLOGY
-                </span>
-              </div>
-              <p class="text-xs text-slate-400">
-                Formal 30-question empirical evaluation plan defining research metrics, mathematical formulas, required data schemas, aggregation policies, and answerability criteria across 7 categories.
-              </p>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-2">
-              <button onclick="openQuantitativeMatrixModal()" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium text-xs shadow-md shadow-purple-500/20 flex items-center space-x-1.5 transition cursor-pointer">
-                <i data-lucide="eye" class="w-3.5 h-3.5"></i>
-                <span>Open Matrix Inspector (Q01–Q30)</span>
-              </button>
-              <a href="/api/evaluation/quantitative-questions" target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs flex items-center space-x-1.5 transition cursor-pointer">
-                <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                <span>View Raw JSON</span>
-              </a>
-            </div>
-          </div>
-
-          <!-- Matrix Plan Notice -->
-          <div class="p-3.5 rounded-xl bg-purple-950/30 border border-purple-800/50 flex items-start space-x-3 text-xs text-slate-300">
-            <i data-lucide="info" class="w-4 h-4 text-purple-400 shrink-0 mt-0.5"></i>
-            <div class="space-y-1">
-              <p>
-                <strong class="text-purple-300">Methodological Note:</strong> This structured matrix defines the planned quantitative evaluation plan and strict answerability requirements. All 30 questions are currently initialized to <code class="px-1 py-0.5 rounded bg-purple-900/50 text-purple-200 font-mono text-[11px]">not_measured</code>. No results are fabricated.
-              </p>
-              <p class="text-[11px] text-slate-400">
-                Source specification: <span class="font-mono text-slate-300">testpilot/evaluation/quantitative_evaluation_questions.json</span>
-              </p>
-            </div>
-          </div>
-
-          <!-- 7 Categories Grid -->
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-            <div onclick="openQuantitativeMatrixModal('Category A — Test Selection Quality')" class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-cyan-500/40 cursor-pointer transition space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-cyan-300">Category A</span>
-                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">Q01–Q06</span>
-              </div>
-              <div class="font-semibold text-slate-200 text-xs">Test Selection Quality</div>
-              <p class="text-[11px] text-slate-400">Precision, recall, F1, reduction, and Naive vs RAG comparison.</p>
-            </div>
-
-            <div onclick="openQuantitativeMatrixModal('Category B — Dependency and Impact Analysis')" class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-purple-500/40 cursor-pointer transition space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-purple-300">Category B</span>
-                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-950 text-purple-400 border border-purple-800">Q07–Q12</span>
-              </div>
-              <div class="font-semibold text-slate-200 text-xs">Dependency & Impact</div>
-              <p class="text-[11px] text-slate-400">Symbol detection, direct callers, transitive propagation, and evidence validity.</p>
-            </div>
-
-            <div onclick="openQuantitativeMatrixModal('Category C — Repository RAG and Evidence Retrieval')" class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-indigo-500/40 cursor-pointer transition space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-indigo-300">Category C</span>
-                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-400 border border-indigo-800">Q13–Q18</span>
-              </div>
-              <div class="font-semibold text-slate-200 text-xs">RAG & Retrieval</div>
-              <p class="text-[11px] text-slate-400">Precision@K, Evidence Recall@K, Sourcegraph vs local AST, and fallback resilience.</p>
-            </div>
-
-            <div onclick="openQuantitativeMatrixModal('Category D — Test Generation and Ground Truth')" class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-emerald-500/40 cursor-pointer transition space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-emerald-300">Category D</span>
-                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">Q19–Q22</span>
-              </div>
-              <div class="font-semibold text-slate-200 text-xs">Test Generation & GT</div>
-              <p class="text-[11px] text-slate-400">Candidate tests viability, mutation detection rate, and historical bug reproduction.</p>
-            </div>
-
-            <div onclick="openQuantitativeMatrixModal('Category E — Performance and Scalability')" class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-amber-500/40 cursor-pointer transition space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-amber-300">Category E</span>
-                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800">Q23–Q25</span>
-              </div>
-              <div class="font-semibold text-slate-200 text-xs">Performance & Scale</div>
-              <p class="text-[11px] text-slate-400">CI time savings, stage latency breakdown, and scaling curves.</p>
-            </div>
-
-            <div onclick="openQuantitativeMatrixModal('Category F — Reliability and Generalization')" class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-rose-500/40 cursor-pointer transition space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-rose-300">Category F</span>
-                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800">Q26–Q28</span>
-              </div>
-              <div class="font-semibold text-slate-200 text-xs">Reliability & Variance</div>
-              <p class="text-[11px] text-slate-400">Jaccard selection consistency, cross-repo variance, and change-type accuracy.</p>
-            </div>
-
-            <div onclick="openQuantitativeMatrixModal('Category G — Evaluation Validity and Usability')" class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-teal-500/40 cursor-pointer transition space-y-1.5 lg:col-span-2">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-teal-300">Category G</span>
-                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800">Q29–Q30</span>
-              </div>
-              <div class="font-semibold text-slate-200 text-xs">Evaluation Validity & Usability</div>
-              <p class="text-[11px] text-slate-400">Scientific validity audit score and automated pipeline completion rate vs manual intervention.</p>
-            </div>
           </div>
         </div>
 
@@ -3301,6 +3354,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
       fetchSystemStatus();
+      fetchActiveWorkflowOverview();
       fetchEvaluationOverview();
       fetchEvaluationBenchmarks();
       fetchEvaluationComponents();
@@ -3405,6 +3459,9 @@
         }
       }
 
+      if (tabId === 'overview') {
+        fetchActiveWorkflowOverview();
+      }
       if (tabId === 'evaluation' || tabId === 'benchmark') {
         fetchEvaluationOverview();
         fetchEvaluationBenchmarks();
@@ -3469,6 +3526,139 @@
         logTerminal('SUCCESS', `Subsystems healthy: Python=${data.python_runtime}, Ollama=${ollamaStatus}, SG=${data.sourcegraph?.status}`);
       } catch (err) {
         logTerminal('ERROR', `Failed to query system status: ${err.message}`);
+      }
+    }
+
+    // 1b. Fetch Active Workflow & Decision Center Overview
+    async function fetchActiveWorkflowOverview() {
+      try {
+        const res = await fetch('/api/workflow/active');
+        if (!res.ok) return;
+        const wf = await res.json();
+        if (wf.workflow_id) {
+          window.currentWorkflowId = wf.workflow_id;
+        }
+
+        // 1. Repo & Revisions
+        const repoEl = document.getElementById('overview-repo-name');
+        if (repoEl) repoEl.textContent = wf.repo_name || wf.repo_id || 'Testbed';
+        const pathEl = document.getElementById('overview-repo-path');
+        if (pathEl) pathEl.textContent = wf.repo_path || '.';
+        const baseEl = document.getElementById('overview-base-sha');
+        if (baseEl) baseEl.textContent = (wf.base_commit_hash || '').slice(0, 10) || 'HEAD~1';
+        const targetEl = document.getElementById('overview-target-sha');
+        if (targetEl) targetEl.textContent = (wf.target_commit_hash || '').slice(0, 10) || 'HEAD';
+        const dirtyEl = document.getElementById('overview-dirty-indicator');
+        if (dirtyEl) {
+          dirtyEl.textContent = wf.is_dirty ? 'DIRTY WORKING TREE' : 'CLEAN HEAD';
+          dirtyEl.className = wf.is_dirty
+            ? 'text-[9px] px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-800'
+            : 'text-[9px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-800';
+        }
+
+        const stages = wf.stages || {};
+        const evo = stages.evolution || {};
+        const imp = stages.impact || {};
+        const sel = stages.selection || {};
+        const exec = stages.execution || {};
+        const arb = stages.arbitration || {};
+
+        // Workflow overall badge
+        const wfBadge = document.getElementById('overview-workflow-badge');
+        if (wfBadge) {
+          let stageLabel = 'ACTIVE';
+          if (arb.status === 'COMPLETED') stageLabel = 'ARBITRATION VERIFIED';
+          else if (exec.status === 'COMPLETED') stageLabel = 'EXECUTION COMPLETED';
+          else if (sel.status === 'COMPLETED') stageLabel = 'TESTS SELECTED';
+          else if (imp.status === 'COMPLETED') stageLabel = 'IMPACT ANALYZED';
+          else if (evo.status === 'COMPLETED') stageLabel = 'EVOLUTION READY';
+          wfBadge.textContent = `${wf.workflow_id} [${stageLabel}]`;
+          wfBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800';
+        }
+
+        // Q2 Evolution
+        const evoSum = evo.summary || {};
+        const chFiles = document.getElementById('overview-changed-files');
+        if (chFiles) chFiles.textContent = evoSum.changed_files_count !== undefined ? evoSum.changed_files_count : 0;
+        const chSyms = document.getElementById('overview-changed-symbols');
+        if (chSyms) chSyms.textContent = evoSum.changed_symbols_count !== undefined ? evoSum.changed_symbols_count : 0;
+        const evoS = document.getElementById('overview-evo-summary');
+        if (evoS) evoS.textContent = evo.status === 'COMPLETED' ? 'Diff & symbol identity verified' : 'Evolution indexing ready';
+
+        // Q3 Impact
+        const impSum = imp.summary || {};
+        const dirCallers = document.getElementById('overview-direct-callers');
+        if (dirCallers) dirCallers.textContent = impSum.direct_callers_count !== undefined ? impSum.direct_callers_count : 0;
+        const bndImp = document.getElementById('overview-boundary-impacts');
+        if (bndImp) bndImp.textContent = impSum.boundary_impacts_count !== undefined ? impSum.boundary_impacts_count : 0;
+        const impS = document.getElementById('overview-impact-summary');
+        if (impS) impS.textContent = imp.status === 'COMPLETED' ? `${impSum.impacted_tests_count || 0} impacted tests reachable` : 'Call-graph hierarchy ready';
+
+        // Q4 Selection
+        const selSum = sel.summary || {};
+        const selCnt = document.getElementById('overview-selected-count');
+        if (selCnt) selCnt.textContent = selSum.selected_tests_count !== undefined ? selSum.selected_tests_count : 0;
+        const suiteRed = document.getElementById('overview-suite-reduction');
+        if (suiteRed) suiteRed.textContent = selSum.suite_reduction_percentage !== undefined ? `${selSum.suite_reduction_percentage.toFixed(1)}%` : '--%';
+        const selS = document.getElementById('overview-selection-summary');
+        if (selS) selS.textContent = sel.status === 'COMPLETED' ? `~${(selSum.time_savings_percentage || 0).toFixed(0)}% runtime saved` : '5-criterion ranking ready';
+
+        // Q5 Execution
+        const execSum = exec.summary || {};
+        const execTot = document.getElementById('overview-exec-total');
+        if (execTot) execTot.textContent = execSum.total_executed !== undefined ? execSum.total_executed : 0;
+        const execPass = document.getElementById('overview-exec-passed');
+        if (execPass) execPass.textContent = execSum.passed !== undefined ? execSum.passed : 0;
+        const execFail = document.getElementById('overview-exec-failed');
+        if (execFail) execFail.textContent = (execSum.failed || 0) + (execSum.errors || 0);
+        const dockLbl = document.getElementById('overview-docker-status-label');
+        if (dockLbl) {
+          dockLbl.textContent = exec.status === 'COMPLETED'
+            ? (execSum.is_docker_isolated ? '✓ Disposable Container Sandbox' : 'Local Test Runner')
+            : 'Disposable Docker Runner Ready';
+        }
+
+        // Q6 Arbitration
+        const arbSum = arb.summary || {};
+        const catCounts = arbSum.category_counts || {};
+        const regCount = catCounts.REGRESSION || 0;
+        const preCount = (catCounts.PRE_EXISTING || 0) + (catCounts.FLAKY || 0) + (catCounts.TEST_DEFECT || 0);
+        const arbReg = document.getElementById('overview-arb-regressions');
+        if (arbReg) arbReg.textContent = regCount;
+        const arbPre = document.getElementById('overview-arb-preexisting');
+        if (arbPre) arbPre.textContent = preCount;
+        const arbS = document.getElementById('overview-arbitration-summary');
+        if (arbS) arbS.textContent = arb.status === 'COMPLETED' ? `${arbSum.total_failures_triaged || 0} failures triaged` : 'Three-valued triage ready';
+
+        // Decision Action Banner
+        const actTitle = document.getElementById('overview-action-title');
+        const actDesc = document.getElementById('overview-action-description');
+        const actIcon = document.getElementById('overview-action-icon');
+        if (regCount > 0) {
+          if (actTitle) actTitle.textContent = 'High-Risk Regression Detected';
+          if (actDesc) actDesc.textContent = `${regCount} regression failure(s) identified. Inspect Failure Arbitration tracebacks in Stage 4 before releasing.`;
+          if (actIcon) {
+            actIcon.className = 'p-2 rounded-lg bg-rose-950 text-rose-400 border border-rose-800 shrink-0';
+            actIcon.innerHTML = '<i data-lucide="alert-triangle" class="w-5 h-5"></i>';
+          }
+        } else if (exec.status === 'COMPLETED' && (execSum.total_executed || 0) > 0) {
+          if (actTitle) actTitle.textContent = 'Regression-Free: All Isolated Tests Passed';
+          if (actDesc) actDesc.textContent = `All ${execSum.total_executed} selected tests passed cleanly in isolated Docker container. Changes are verified.`;
+          if (actIcon) {
+            actIcon.className = 'p-2 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800 shrink-0';
+            actIcon.innerHTML = '<i data-lucide="check-circle-2" class="w-5 h-5"></i>';
+          }
+        } else if (sel.status === 'COMPLETED') {
+          if (actTitle) actTitle.textContent = 'Tests Selected: Ready for Docker Execution';
+          if (actDesc) actDesc.textContent = `${selSum.selected_tests_count || 0} tests selected (${(selSum.suite_reduction_percentage || 0).toFixed(0)}% suite reduction). Execute inside disposable container.`;
+          if (actIcon) {
+            actIcon.className = 'p-2 rounded-lg bg-blue-950 text-blue-400 border border-blue-800 shrink-0';
+            actIcon.innerHTML = '<i data-lucide="play" class="w-5 h-5"></i>';
+          }
+        }
+        lucide.createIcons();
+      } catch (err) {
+        console.warn('Workflow overview poll failed:', err);
       }
     }
 
@@ -3853,10 +4043,11 @@
               <thead class="bg-slate-950/70 text-slate-400 border-b border-slate-800">
                 <tr>
                   <th class="py-2.5 px-3">Test Function</th>
-                  <th class="py-2.5 px-3">File Path</th>
+                  <th class="py-2.5 px-3">Coupling</th>
                   <th class="py-2.5 px-3">Target Symbol</th>
-                  <th class="py-2.5 px-3">Selection Tier</th>
-                  <th class="py-2.5 px-3">Command</th>
+                  <th class="py-2.5 px-3">Tier</th>
+                  <th class="py-2.5 px-3">Selection Rationale & Evidence</th>
+                  <th class="py-2.5 px-3">Execution Command</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/60">
@@ -3864,18 +4055,47 @@
 
         data.selected_tests.forEach(t => {
           const tierBg = t.selection_tier === 'CRITICAL' ? 'bg-rose-950 text-rose-300 border-rose-800' : 'bg-amber-950 text-amber-300 border-amber-800';
+          const isDirectBadge = t.is_direct
+            ? '<span class="px-1.5 py-0.5 rounded text-[9px] bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold">DIRECT AST</span>'
+            : '<span class="px-1.5 py-0.5 rounded text-[9px] bg-indigo-950 text-indigo-300 border border-indigo-800 font-bold">TRANSITIVE</span>';
+          const criteriaBadges = (t.selection_criteria || []).map(c => `<span class="px-1 py-0.2 rounded text-[8px] bg-slate-800 text-slate-300 border border-slate-700 font-mono">${escapeHtml(c)}</span>`).join(' ');
+
           html += `
             <tr class="hover:bg-slate-800/40 transition">
-              <td class="py-2 px-3 text-white font-bold">${escapeHtml(t.test_name)}</td>
-              <td class="py-2 px-3 text-slate-400 text-[11px]">${escapeHtml(t.test_file)}</td>
-              <td class="py-2 px-3 text-cyan-400">${escapeHtml(t.targeted_symbol)}</td>
-              <td class="py-2 px-3"><span class="px-1.5 py-0.5 rounded text-[9px] border ${tierBg}">${t.selection_tier}</span></td>
-              <td class="py-2 px-3 text-[10px] text-slate-500">${escapeHtml(t.execution_command)}</td>
+              <td class="py-2.5 px-3">
+                <div class="text-white font-bold">${escapeHtml(t.test_name)}</div>
+                <div class="text-[10px] text-slate-500">${escapeHtml(t.test_file)}</div>
+              </td>
+              <td class="py-2.5 px-3">${isDirectBadge}</td>
+              <td class="py-2.5 px-3 text-cyan-400 font-semibold">${escapeHtml(t.targeted_symbol)}</td>
+              <td class="py-2.5 px-3"><span class="px-1.5 py-0.5 rounded text-[9px] border ${tierBg}">${t.selection_tier}</span></td>
+              <td class="py-2.5 px-3 font-sans text-[11px] text-slate-300 max-w-xs">
+                <div>${escapeHtml(t.selection_reason || 'AST coupling')}</div>
+                <div class="mt-1 flex flex-wrap gap-1">${criteriaBadges}</div>
+              </td>
+              <td class="py-2.5 px-3 text-[10px] text-slate-400">
+                <div class="p-1 rounded bg-slate-950 border border-slate-800 text-cyan-300 overflow-x-auto max-w-xs">${escapeHtml(t.execution_command)}</div>
+              </td>
             </tr>
           `;
         });
 
         html += `</tbody></table></div>`;
+
+        // Uncovered Impacted Behaviors (if any)
+        if (data.uncovered_impacted_symbols && data.uncovered_impacted_symbols.length > 0) {
+          html += `
+            <div class="p-4 rounded-xl border border-amber-900/60 bg-amber-950/20 space-y-2">
+              <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs">
+                <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                <span>Uncovered Impacted Symbols (${data.uncovered_impacted_symbols.length} Behaviors Without Existing Regression Tests)</span>
+              </div>
+              <div class="flex flex-wrap gap-2 pt-1 font-mono text-[11px]">
+                ${data.uncovered_impacted_symbols.map(s => `<span class="px-2 py-0.5 rounded bg-slate-950 text-amber-300 border border-amber-800/60">${escapeHtml(s)}</span>`).join('')}
+              </div>
+            </div>
+          `;
+        }
 
         // Render 5-Criterion Qualified Targeted Tests
         if (data.targeted_generated_tests && data.targeted_generated_tests.length > 0) {
@@ -3892,14 +4112,22 @@
           `;
 
           data.targeted_generated_tests.forEach(tgt => {
+            const q = tgt.qualification_details || {};
             html += `
-              <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800 text-xs font-mono space-y-2">
+              <div class="p-3.5 rounded-lg bg-slate-950/80 border border-slate-800 text-xs font-mono space-y-2">
                 <div class="flex items-center justify-between text-[11px]">
                   <span class="text-white font-bold">${escapeHtml(tgt.test_name)}</span>
                   <span class="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[9px]">5/5 QUALIFIED</span>
                 </div>
-                <div class="text-[10px] text-slate-400">Target: ${escapeHtml(tgt.target_symbol)}</div>
-                <div class="bg-slate-900/80 p-2 rounded text-[10px] text-cyan-300 overflow-x-auto whitespace-pre">${escapeHtml(tgt.code)}</div>
+                <div class="text-[10px] text-slate-400">Target: <strong class="text-yellow-400">${escapeHtml(tgt.target_symbol)}</strong></div>
+                <!-- 5-Criterion Checklist -->
+                <div class="grid grid-cols-2 gap-1 text-[9px] text-slate-400 pt-1 border-t border-slate-800/60">
+                  <span class="${q.ast_syntax_valid ? 'text-emerald-400' : 'text-slate-600'}">✓ AST Syntax Valid</span>
+                  <span class="${q.collectable ? 'text-emerald-400' : 'text-slate-600'}">✓ Pytest Collectable</span>
+                  <span class="${q.has_non_trivial_assertions ? 'text-emerald-400' : 'text-slate-600'}">✓ Non-Trivial Assert</span>
+                  <span class="${q.contract_grounded ? 'text-emerald-400' : 'text-slate-600'}">✓ Contract Grounded</span>
+                </div>
+                <div class="bg-slate-900/80 p-2 rounded text-[10px] text-cyan-300 overflow-x-auto whitespace-pre max-h-40">${escapeHtml(tgt.code)}</div>
               </div>
             `;
           });
@@ -3910,6 +4138,7 @@
         container.innerHTML = html;
         logTerminal('SUCCESS', `Intelligent Selection complete: ${data.selected_tests.length} tests selected (${data.efficiency.suite_reduction_percentage}% reduction).`);
         lucide.createIcons();
+        fetchActiveWorkflowOverview();
       } catch (err) {
         logTerminal('ERROR', `Test Selection failed: ${err.message}`);
         container.innerHTML = `<div class="p-4 text-xs text-rose-400 bg-rose-950/30 border border-rose-800 rounded-xl">Error: ${escapeHtml(err.message)}</div>`;
@@ -3974,38 +4203,60 @@
         document.getElementById('execution-kpi-failed').textContent = data.failed_count + data.error_count;
         document.getElementById('execution-kpi-duration').textContent = `${data.execution_duration_ms.toFixed(1)} ms`;
 
-        // Render Results Table
+        // Render Results Table with Inspectable Pytest Logs
         let html = `
           <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 shadow-lg space-y-4 p-4 font-mono">
-            <div class="flex items-center justify-between text-xs">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
               <span class="font-bold text-white flex items-center space-x-2">
                 <i data-lucide="container" class="w-4 h-4 text-blue-400"></i>
-                <span>Container Execution Results (${data.passed_count} Passed, ${data.failed_count + data.error_count} Failed)</span>
+                <span>Isolated Container Run (${data.passed_count} Passed, ${data.failed_count + data.error_count} Failed)</span>
               </span>
-              <span class="text-[10px] px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">ISOLATION: ${data.is_docker_isolated ? 'DOCKER CONTAINER' : 'SANDBOX SIMULATOR'}</span>
+              <div class="flex items-center space-x-2 text-[10px]">
+                <span class="px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">IMAGE: testpilot-runner:latest</span>
+                <span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">ISOLATION: ${data.is_docker_isolated ? 'DOCKER CONTAINER' : 'SANDBOX SIMULATOR'}</span>
+              </div>
             </div>
             <table class="w-full text-left text-xs">
               <thead class="bg-slate-950/70 text-slate-400 border-b border-slate-800">
                 <tr>
                   <th class="py-2.5 px-3">Test Case</th>
+                  <th class="py-2.5 px-3">Target Symbol</th>
                   <th class="py-2.5 px-3">File</th>
                   <th class="py-2.5 px-3">Outcome</th>
                   <th class="py-2.5 px-3">Duration</th>
-                  <th class="py-2.5 px-3">Message</th>
+                  <th class="py-2.5 px-3">Exit Code</th>
+                  <th class="py-2.5 px-3">Container Telemetry & Pytest Logs</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/60">
         `;
 
-        data.results.forEach(r => {
-          const outcomeBadge = r.outcome === 'PASSED' ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-rose-950 text-rose-300 border-rose-800';
+        data.results.forEach((r, idx) => {
+          const outcomeBadge = r.outcome === 'PASSED'
+            ? 'bg-emerald-950 text-emerald-300 border-emerald-800 font-bold'
+            : 'bg-rose-950 text-rose-300 border-rose-800 font-bold';
+          const exitBadge = r.exit_code === 0
+            ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
+            : 'bg-rose-950 text-rose-400 border-rose-800';
+
           html += `
             <tr class="hover:bg-slate-800/40 transition">
-              <td class="py-2 px-3 text-white font-bold">${escapeHtml(r.test_name)}</td>
-              <td class="py-2 px-3 text-slate-400 text-[11px]">${escapeHtml(r.test_file)}</td>
-              <td class="py-2 px-3"><span class="px-1.5 py-0.5 rounded text-[9px] border ${outcomeBadge}">${r.outcome}</span></td>
-              <td class="py-2 px-3 text-slate-400">${r.duration_ms.toFixed(1)} ms</td>
-              <td class="py-2 px-3 text-[10px] text-slate-500">${escapeHtml(r.error_message || 'OK')}</td>
+              <td class="py-2.5 px-3 text-white font-bold">${escapeHtml(r.test_name)}</td>
+              <td class="py-2.5 px-3 text-cyan-400 text-[11px]">${escapeHtml(r.targeted_symbol || 'repository_root')}</td>
+              <td class="py-2.5 px-3 text-slate-400 text-[11px]">${escapeHtml(r.test_file)}</td>
+              <td class="py-2.5 px-3"><span class="px-1.5 py-0.5 rounded text-[9px] border ${outcomeBadge}">${r.outcome}</span></td>
+              <td class="py-2.5 px-3 text-slate-300">${r.duration_ms.toFixed(1)} ms</td>
+              <td class="py-2.5 px-3"><span class="px-1.5 py-0.5 rounded text-[9px] font-mono border ${exitBadge}">exit ${r.exit_code}</span></td>
+              <td class="py-2.5 px-3">
+                <details class="text-[10px] text-slate-400 font-mono">
+                  <summary class="cursor-pointer text-cyan-400 hover:text-cyan-300 font-medium">View Pytest Session Logs</summary>
+                  <div class="mt-2 space-y-2 p-2.5 rounded bg-slate-950 border border-slate-800">
+                    ${r.error_message ? `<div class="text-rose-400 font-bold">${escapeHtml(r.error_message)}</div>` : ''}
+                    ${r.stdout ? `<div><div class="text-slate-500 text-[9px] uppercase font-bold mb-1">Standard Output:</div><pre class="text-slate-300 bg-slate-900/80 p-2 rounded overflow-x-auto max-h-36 whitespace-pre">${escapeHtml(r.stdout)}</pre></div>` : ''}
+                    ${r.traceback ? `<div><div class="text-rose-400 text-[9px] uppercase font-bold mb-1">Traceback:</div><pre class="text-rose-300 bg-rose-950/40 border border-rose-900/60 p-2 rounded overflow-x-auto max-h-36 whitespace-pre">${escapeHtml(r.traceback)}</pre></div>` : ''}
+                  </div>
+                </details>
+              </td>
             </tr>
           `;
         });
@@ -4014,6 +4265,7 @@
         container.innerHTML = html;
         logTerminal('SUCCESS', `Isolated container execution finished: ${data.total_executed} tests executed.`);
         lucide.createIcons();
+        fetchActiveWorkflowOverview();
       } catch (err) {
         logTerminal('ERROR', `Execution failed: ${err.message}`);
         container.innerHTML = `<div class="p-4 text-xs text-rose-400 bg-rose-950/30 border border-rose-800 rounded-xl">Execution Error: ${escapeHtml(err.message)}</div>`;
@@ -4171,6 +4423,7 @@
 
         renderArbitrationTable(data.items);
         logTerminal('SUCCESS', `Stage 4 Arbitration Complete: ${data.items.length} failure(s) triaged across 6 categories.`);
+        fetchActiveWorkflowOverview();
       } catch (err) {
         logTerminal('ERROR', `Arbitration failed: ${err.message}`);
         container.innerHTML = `<div class="p-4 text-xs text-rose-400 bg-rose-950/30 border border-rose-800 rounded-xl">Arbitration Error: ${escapeHtml(err.message)}</div>`;
@@ -4340,6 +4593,7 @@
         currentArbitrationData = updatedReport;
         renderArbitrationTable(updatedReport.items);
         logTerminal('SUCCESS', `Arbitration review submitted for item ${itemId}: ${reviewStatus} (${overrideCategory || 'Retained'})`);
+        fetchActiveWorkflowOverview();
       } catch (err) {
         logTerminal('ERROR', `Review submission failed: ${err.message}`);
         alert(`Review error: ${err.message}`);
@@ -5722,6 +5976,7 @@
         logTerminal('INFO', '=======================================================');
         logTerminal('INFO', '🚀 LAUNCHING FULL SEQUENTIAL TESTPILOT PIPELINE');
         logTerminal('INFO', 'Stages: 0: Init & Evolution -> 1: Impact -> 2: Selection -> 3: Execution -> 4: Arbitration');
+        // TestPilot Single-Shot Autonomous API Route: /api/pipeline/run
         logTerminal('INFO', '=======================================================');
 
         const baseRef = document.getElementById('evo-base-ref')?.value?.trim() || 'HEAD~1';
@@ -6102,6 +6357,10 @@
     let currentEvalSubTab = 'overview';
     let cachedBenchmarkCases = [];
     let evaluationSuiteMode = 'authoritative'; // 'authoritative' | 'custom'
+    let authoritativeMatrixFilter = 'evaluated'; // 'evaluated' | 'all'
+    let evalMatrixSearchQuery = '';
+    let cachedPrimaryMatrixData = [];
+    let cachedEvaluationOverviewData = null;
     let cachedCustomRepos = [];
     let selectedCustomRepoId = '';
     let customMatrixAggregation = 'micro'; // 'micro' | 'macro'
@@ -6134,7 +6393,7 @@
     }
 
     // -------------------------------------------------------------------------
-    // Custom Repository Benchmark Suite Operations
+    // Custom Repository Benchmark Suite Operations & Matrix Filtering
     // -------------------------------------------------------------------------
 
     function switchEvaluationSuiteMode(mode) {
@@ -6148,6 +6407,8 @@
       const matrixSubheading = document.getElementById('eval-matrix-subheading');
       const noticeBar = document.getElementById('custom-suite-matrix-notice');
       const badge = document.getElementById('eval-matrix-badge');
+      const authScopeToggle = document.getElementById('authoritative-scope-toggle');
+      const searchInput = document.getElementById('eval-matrix-search-input');
 
       if (mode === 'custom') {
         if (btnAuth) {
@@ -6162,6 +6423,7 @@
         if (aggToggle) aggToggle.classList.remove('hidden');
         if (extraStats) extraStats.classList.remove('hidden');
         if (noticeBar) noticeBar.classList.remove('hidden');
+        if (authScopeToggle) authScopeToggle.classList.add('hidden');
         if (matrixHeading) matrixHeading.textContent = 'Custom Repository Evaluation Matrix';
         if (matrixSubheading) matrixSubheading.textContent = 'Dynamic evaluation results measured across user-registered repositories.';
         if (badge) {
@@ -6181,6 +6443,7 @@
         if (aggToggle) aggToggle.classList.add('hidden');
         if (extraStats) extraStats.classList.add('hidden');
         if (noticeBar) noticeBar.classList.add('hidden');
+        if (authScopeToggle) authScopeToggle.classList.remove('hidden');
         if (matrixHeading) matrixHeading.textContent = 'Primary Research Evaluation Matrix';
         if (matrixSubheading) matrixSubheading.textContent = 'Authoritative evaluation matrix across evaluated configurations with empirical benchmark measurements.';
         if (badge) {
@@ -6189,6 +6452,100 @@
         }
       }
       fetchEvaluationOverview();
+    }
+
+    function setAuthoritativeMatrixFilter(filter) {
+      authoritativeMatrixFilter = filter;
+      const btnEval = document.getElementById('btn-scope-evaluated');
+      const btnAll = document.getElementById('btn-scope-all');
+      if (btnEval && btnAll) {
+        if (filter === 'evaluated') {
+          btnEval.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800/80 cursor-pointer';
+          btnAll.className = 'px-2 py-0.5 rounded text-[10px] font-mono text-slate-400 hover:text-slate-200 cursor-pointer';
+        } else {
+          btnEval.className = 'px-2 py-0.5 rounded text-[10px] font-mono text-slate-400 hover:text-slate-200 cursor-pointer';
+          btnAll.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800/80 cursor-pointer';
+        }
+      }
+      renderPrimaryEvaluationMatrix(cachedEvaluationOverviewData);
+    }
+
+    function onEvalMatrixSearchInput(query) {
+      evalMatrixSearchQuery = (query || '').toLowerCase().trim();
+      renderPrimaryEvaluationMatrix(cachedEvaluationOverviewData);
+    }
+
+    function renderPrimaryEvaluationMatrix(data) {
+      const primaryBody = document.getElementById('eval-primary-matrix-body');
+      if (!primaryBody) return;
+
+      let rowsToRender = cachedPrimaryMatrixData || [];
+      if (evaluationSuiteMode === 'authoritative') {
+        if (authoritativeMatrixFilter === 'evaluated') {
+          rowsToRender = rowsToRender.filter(row => row.is_evaluated);
+        }
+      } else if (customMatrixAggregation === 'macro' && data?.macro_matrix && !selectedCustomRepoId) {
+        rowsToRender = data.macro_matrix;
+      }
+
+      if (evalMatrixSearchQuery) {
+        rowsToRender = rowsToRender.filter(row =>
+          (row.configuration || '').toLowerCase().includes(evalMatrixSearchQuery) ||
+          (row.status || '').toLowerCase().includes(evalMatrixSearchQuery) ||
+          (row.notes || '').toLowerCase().includes(evalMatrixSearchQuery)
+        );
+      }
+
+      const formulaLabel = document.getElementById('custom-suite-matrix-formula-label');
+      if (formulaLabel && evaluationSuiteMode === 'custom') {
+        formulaLabel.textContent = (customMatrixAggregation === 'macro' && !selectedCustomRepoId)
+          ? 'Unweighted Mean of Per-Repo Metrics (Macro-Averaged)'
+          : 'Strict Pooled TP/FP/FN Formulas (Micro-Averaged)';
+      }
+
+      if (rowsToRender.length === 0) {
+        primaryBody.innerHTML = `
+          <tr>
+            <td colspan="12" class="px-4 py-8 text-center text-slate-500 font-sans">
+              No configurations match the active filter or query.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      primaryBody.innerHTML = rowsToRender.map(row => {
+        const isTp = row.configuration === 'TestPilot';
+        const rowClass = isTp
+          ? 'hover:bg-cyan-950/20 bg-cyan-950/10 border-l-2 border-cyan-400 transition'
+          : 'hover:bg-slate-900/50 transition';
+        const nameColor = isTp ? 'text-cyan-400 font-bold' : (row.is_evaluated ? 'text-white font-bold' : 'text-slate-300 font-semibold');
+        const dotColor = isTp ? 'bg-cyan-400 animate-pulse' : (row.is_evaluated ? 'bg-emerald-400' : 'bg-amber-400/80');
+
+        const statusBadge = row.is_evaluated
+          ? `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">✓ Evaluated</span>`
+          : `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950 text-amber-300 border border-amber-800">${escapeHtml(row.status || '◐ Not Evaluated Yet')}</span>`;
+
+        return `
+          <tr class="${rowClass}">
+            <td class="px-3 py-3 ${nameColor} flex items-center space-x-2">
+              <span class="w-2 h-2 rounded-full ${dotColor} shrink-0"></span>
+              <span>${escapeHtml(row.configuration)}</span>
+            </td>
+            <td class="px-3 py-3">${statusBadge}</td>
+            <td class="px-3 py-3 font-mono ${row.is_evaluated ? 'text-slate-200' : 'text-slate-600'}">${escapeHtml(row.selected_tests_display || '—')}</td>
+            <td class="px-3 py-3 font-mono ${row.is_evaluated ? 'text-slate-300' : 'text-slate-600'}">${escapeHtml(row.ground_truth_positives_display || '—')}</td>
+            <td class="px-3 py-3 font-mono ${row.is_evaluated ? 'text-emerald-400 font-bold' : 'text-slate-600'}">${escapeHtml(row.tp_display || '—')}</td>
+            <td class="px-3 py-3 font-mono ${row.is_evaluated ? (row.fp === 0 ? 'text-emerald-400 font-bold' : 'text-rose-400') : 'text-slate-600'}">${escapeHtml(row.fp_display || '—')}</td>
+            <td class="px-3 py-3 font-mono ${row.is_evaluated ? (row.fn === 0 ? 'text-emerald-400 font-bold' : 'text-yellow-400') : 'text-slate-600'}">${escapeHtml(row.fn_display || '—')}</td>
+            <td class="px-3 py-3 font-mono ${row.is_evaluated ? (isTp ? 'text-cyan-400 font-bold' : 'text-slate-300') : 'text-slate-600'}">${escapeHtml(row.precision_display || '—')}</td>
+            <td class="px-3 py-3 font-mono ${row.is_evaluated ? 'text-emerald-400 font-bold' : 'text-slate-600'}">${escapeHtml(row.recall_display || '—')}</td>
+            <td class="px-3 py-3 font-mono ${row.is_evaluated ? (isTp ? 'text-purple-400 font-bold' : 'text-slate-300') : 'text-slate-600'}">${escapeHtml(row.f1_display || '—')}</td>
+            <td class="px-3 py-3 font-mono ${row.is_evaluated ? 'text-yellow-400 font-bold' : 'text-slate-600'}">${escapeHtml(row.test_reduction_display || '—')}</td>
+            <td class="px-3 py-3 text-[11px] font-sans ${row.is_evaluated ? 'text-slate-400' : 'text-slate-500 italic'}">${escapeHtml(row.notes || '')}</td>
+          </tr>
+        `;
+      }).join('');
     }
 
     function setCustomMatrixAggregation(mode) {
@@ -6993,6 +7350,257 @@
       }
     }
 
+    function closeInspectRepositoryModal() {
+      const modal = document.getElementById('modal-inspect-repository');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function triggerSequentialPipeline() {
+      runFullPipeline();
+    }
+
+    function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+      }
+      logTerminal('INFO', `Copied to clipboard.`);
+    }
+
+    let currentOnboardingSource = 'public_git';
+    function setRepositoryOnboardingSource(source) {
+      currentOnboardingSource = source;
+      const tabPub = document.getElementById('tab-source-public');
+      const tabPriv = document.getElementById('tab-source-private');
+      const tabLoc = document.getElementById('tab-source-local');
+      const tokenContainer = document.getElementById('container-private-token');
+      const lblPath = document.getElementById('lbl-repo-path');
+      const pathInput = document.getElementById('add-repo-path-input');
+
+      [tabPub, tabPriv, tabLoc].forEach(t => {
+        if (t) t.className = "py-2 px-3 rounded-lg flex items-center justify-center space-x-2 transition text-slate-400 hover:text-slate-200 cursor-pointer";
+      });
+
+      if (source === 'public_git') {
+        if (tabPub) tabPub.className = "py-2 px-3 rounded-lg flex items-center justify-center space-x-2 transition bg-cyan-950 text-cyan-300 border border-cyan-800/80 cursor-pointer";
+        if (tokenContainer) tokenContainer.classList.add('hidden');
+        if (lblPath) lblPath.innerHTML = 'GitHub Repository URL <span class="text-rose-400">*</span>';
+        if (pathInput) pathInput.placeholder = 'https://github.com/org/repo or https://github.com/Shreshth-mod/FinMath';
+      } else if (source === 'private_git') {
+        if (tabPriv) tabPriv.className = "py-2 px-3 rounded-lg flex items-center justify-center space-x-2 transition bg-cyan-950 text-cyan-300 border border-cyan-800/80 cursor-pointer";
+        if (tokenContainer) tokenContainer.classList.remove('hidden');
+        if (lblPath) lblPath.innerHTML = 'Private GitHub Repository URL <span class="text-rose-400">*</span>';
+        if (pathInput) pathInput.placeholder = 'https://github.com/org/private-repo';
+      } else if (source === 'local_folder') {
+        if (tabLoc) tabLoc.className = "py-2 px-3 rounded-lg flex items-center justify-center space-x-2 transition bg-cyan-950 text-cyan-300 border border-cyan-800/80 cursor-pointer";
+        if (tokenContainer) tokenContainer.classList.add('hidden');
+        if (lblPath) lblPath.innerHTML = 'Local Repository Directory Path <span class="text-rose-400">*</span>';
+        if (pathInput) pathInput.placeholder = '/absolute/path/to/repo or .';
+      }
+      lucide.createIcons();
+    }
+
+    function setAddRepoShortcut(path, source) {
+      setRepositoryOnboardingSource(source);
+      const input = document.getElementById('add-repo-path-input');
+      if (input) input.value = path;
+    }
+
+    function toggleTokenVisibility() {
+      const input = document.getElementById('add-repo-token-input');
+      const icon = document.getElementById('icon-toggle-token');
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        if (icon) icon.setAttribute('data-lucide', 'eye-off');
+      } else {
+        input.type = 'password';
+        if (icon) icon.setAttribute('data-lucide', 'eye');
+      }
+      lucide.createIcons();
+    }
+
+    async function validateRepositoryCandidateAction() {
+      const pathInput = document.getElementById('add-repo-path-input')?.value?.trim();
+      const tokenInput = document.getElementById('add-repo-token-input')?.value?.trim() || null;
+      const summaryCard = document.getElementById('repo-validation-summary-card');
+      const btn = document.getElementById('btn-validate-repo-candidate');
+      if (!pathInput) {
+        alert('Please enter a repository URL or local directory path first.');
+        return;
+      }
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader" class="w-3.5 h-3.5 animate-spin"></i><span>Validating...</span>`;
+      lucide.createIcons();
+      try {
+        const res = await fetch('/api/evaluation/custom-suite/validate-repository', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: pathInput, auth_token: tokenInput })
+        });
+        const data = await res.json();
+        if (summaryCard) {
+          summaryCard.classList.remove('hidden');
+          summaryCard.innerHTML = `
+            <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+              <span class="text-white font-bold">${escapeHtml(data.name || pathInput)}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono ${data.accessible ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'}">${data.accessible ? 'ACCESSIBLE' : 'NOT ACCESSIBLE'}</span>
+            </div>
+            <div class="text-[11px] text-slate-300 space-y-1">
+              <div>Primary Language: <span class="text-cyan-400 font-bold">${escapeHtml(data.primary_language || 'Unknown')}</span></div>
+              <div>Framework: <span class="text-slate-300">${escapeHtml(data.test_framework || 'pytest / unittest')}</span></div>
+              <div>Existing Tests Discovered: <span class="text-emerald-400 font-bold">${data.total_tests_discovered || 0}</span></div>
+              ${data.warning ? `<div class="text-amber-400 text-[10px] mt-1 font-sans">⚠️ ${escapeHtml(data.warning)}</div>` : ''}
+            </div>
+          `;
+        }
+        logTerminal('SUCCESS', `Validated candidate: ${data.name || pathInput} (${data.primary_language || 'Python'})`);
+      } catch (err) {
+        if (summaryCard) {
+          summaryCard.classList.remove('hidden');
+          summaryCard.innerHTML = `<div class="text-rose-400 p-2">Validation error: ${escapeHtml(err.message)}</div>`;
+        }
+        logTerminal('ERROR', `Candidate validation failed: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="search-check" class="w-3.5 h-3.5"></i><span>Inspect & Pre-Validate</span>`;
+        lucide.createIcons();
+      }
+    }
+
+    async function startCustomRepoGeneration(repoId) {
+      try {
+        logTerminal('INFO', `Starting autonomous test generation for repository ${repoId}...`);
+        const res = await fetch(`/api/evaluation/custom-suite/repositories/${encodeURIComponent(repoId)}/generation-jobs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ max_targets: 15 })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+        const job = await res.json();
+        logTerminal('SUCCESS', `Generation job [${job.job_id}] launched for repo [${repoId}].`);
+        activeGenerationJobId = job.job_id;
+        activeGenerationRepoId = repoId;
+        generationStartTime = Date.now();
+        renderPipelineTracker(job, repoId);
+        startPipelinePolling(repoId, job.job_id);
+        await fetchCustomRepositories();
+      } catch (err) {
+        logTerminal('ERROR', `Failed to start generation: ${err.message}`);
+        alert(`Failed to start test generation: ${err.message}`);
+      }
+    }
+
+    async function cancelActiveGenerationJob() {
+      if (!activeGenerationJobId) {
+        logTerminal('WARN', 'No active generation job to cancel.');
+        return;
+      }
+      try {
+        logTerminal('INFO', `Cancelling generation job ${activeGenerationJobId}...`);
+        const res = await fetch(`/api/evaluation/custom-suite/generation-jobs/${encodeURIComponent(activeGenerationJobId)}/cancel`, {
+          method: 'POST'
+        });
+        if (generationPollTimer) {
+          clearInterval(generationPollTimer);
+          generationPollTimer = null;
+        }
+        const tracker = document.getElementById('generation-pipeline-tracker');
+        if (tracker) tracker.classList.add('hidden');
+        logTerminal('SUCCESS', `Generation job ${activeGenerationJobId} cancelled.`);
+        await fetchCustomRepositories();
+      } catch (err) {
+        logTerminal('ERROR', `Failed to cancel job: ${err.message}`);
+      }
+    }
+
+    function switchHistoricalBugTab(tab) {
+      const tabMined = document.getElementById('tab-hist-mined');
+      const tabManual = document.getElementById('tab-hist-manual');
+      const panelMined = document.getElementById('panel-hist-mined');
+      const panelManual = document.getElementById('panel-hist-manual');
+      const submitBtn = document.getElementById('btn-submit-hist-bug');
+
+      if (tab === 'mined') {
+        if (tabMined) tabMined.className = "py-1.5 px-3 rounded-lg flex items-center space-x-1.5 bg-purple-950 text-purple-300 border border-purple-800 cursor-pointer";
+        if (tabManual) tabManual.className = "py-1.5 px-3 rounded-lg flex items-center space-x-1.5 text-slate-400 hover:text-slate-200 cursor-pointer";
+        if (panelMined) panelMined.classList.remove('hidden');
+        if (panelManual) panelManual.classList.add('hidden');
+        if (submitBtn) submitBtn.classList.add('hidden');
+      } else {
+        if (tabManual) tabManual.className = "py-1.5 px-3 rounded-lg flex items-center space-x-1.5 bg-purple-950 text-purple-300 border border-purple-800 cursor-pointer";
+        if (tabMined) tabMined.className = "py-1.5 px-3 rounded-lg flex items-center space-x-1.5 text-slate-400 hover:text-slate-200 cursor-pointer";
+        if (panelManual) panelManual.classList.remove('hidden');
+        if (panelMined) panelMined.classList.add('hidden');
+        if (submitBtn) submitBtn.classList.remove('hidden');
+      }
+      lucide.createIcons();
+    }
+
+    async function scanHistoricalBugCandidates() {
+      const repoId = document.getElementById('hist-bug-repo-id-input')?.value;
+      if (!repoId) return;
+      const loading = document.getElementById('hist-mined-loading');
+      const empty = document.getElementById('hist-mined-empty');
+      const container = document.getElementById('hist-mined-candidates-container');
+      const btn = document.getElementById('btn-scan-hist-bugs');
+
+      if (loading) loading.classList.remove('hidden');
+      if (empty) empty.classList.add('hidden');
+      if (container) container.innerHTML = '';
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/evaluation/custom-suite/repositories/${encodeURIComponent(repoId)}/mine-historical-bugs`, {
+          method: 'POST'
+        });
+        const data = await res.json();
+        if (loading) loading.classList.add('hidden');
+        if (!data.candidates || data.candidates.length === 0) {
+          if (empty) {
+            empty.textContent = 'No historical regression commit pairs identified in recent git log.';
+            empty.classList.remove('hidden');
+          }
+          return;
+        }
+        container.innerHTML = data.candidates.map((c, idx) => `
+          <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-purple-800/80 transition space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-purple-300 font-bold text-xs">${escapeHtml(c.scenario_name || `Bug Fix #${idx+1}`)}</span>
+              <span class="text-[10px] text-slate-400 font-mono">${escapeHtml(c.buggy_commit ? c.buggy_commit.slice(0, 8) : '')} &rarr; ${escapeHtml(c.corrected_commit ? c.corrected_commit.slice(0, 8) : '')}</span>
+            </div>
+            <div class="text-[11px] text-slate-300">${escapeHtml(c.commit_message || '')}</div>
+            <div class="flex items-center justify-between pt-1">
+              <span class="text-[10px] text-slate-500 font-mono">${escapeHtml(c.test_file || '')}::${escapeHtml(c.test_name || '')}</span>
+              <button onclick="applyHistoricalCandidate('${escapeHtml(c.buggy_commit || '')}', '${escapeHtml(c.corrected_commit || '')}', '${escapeHtml(c.test_file || '')}', '${escapeHtml(c.test_name || '')}', '${escapeHtml(c.scenario_name || '')}')" class="px-2 py-1 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 text-[10px] font-sans font-semibold transition cursor-pointer">
+                Use This Pair
+              </button>
+            </div>
+          </div>
+        `).join('');
+        lucide.createIcons();
+      } catch (err) {
+        if (loading) loading.classList.add('hidden');
+        if (empty) {
+          empty.textContent = `Error mining historical bugs: ${err.message}`;
+          empty.classList.remove('hidden');
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    function applyHistoricalCandidate(buggy, corrected, testFile, testName, scenario) {
+      switchHistoricalBugTab('manual');
+      if (buggy) document.getElementById('hist-bug-buggy-commit').value = buggy;
+      if (corrected) document.getElementById('hist-bug-corrected-commit').value = corrected;
+      if (testFile) document.getElementById('hist-bug-test-file').value = testFile;
+      if (testName) document.getElementById('hist-bug-test-name').value = testName;
+      if (scenario) document.getElementById('hist-bug-scenario-name').value = scenario;
+    }
+
     // -------------------------------------------------------------------------
     // Main Evaluation Overview & Matrix Fetcher
     // -------------------------------------------------------------------------
@@ -7078,65 +7686,9 @@
         }
 
         // 3. Populate Primary / Custom Evaluation Matrix
-        const primaryBody = document.getElementById('eval-primary-matrix-body');
-        if (primaryBody && data.primary_matrix) {
-          let rowsToRender = data.primary_matrix;
-          if (evaluationSuiteMode === 'authoritative') {
-            rowsToRender = data.primary_matrix.filter(row => row.is_evaluated);
-          } else if (customMatrixAggregation === 'macro' && data.macro_matrix && !selectedCustomRepoId) {
-            rowsToRender = data.macro_matrix;
-          }
-
-          const formulaLabel = document.getElementById('custom-suite-matrix-formula-label');
-          if (formulaLabel && evaluationSuiteMode === 'custom') {
-            formulaLabel.textContent = (customMatrixAggregation === 'macro' && !selectedCustomRepoId)
-              ? 'Unweighted Mean of Per-Repo Metrics (Macro-Averaged)'
-              : 'Strict Pooled TP/FP/FN Formulas (Micro-Averaged)';
-          }
-
-          if (rowsToRender.length === 0) {
-            primaryBody.innerHTML = `
-              <tr>
-                <td colspan="12" class="px-4 py-8 text-center text-slate-500 font-sans">
-                  No evaluated runs recorded yet. Prepare benchmark ground truth and click "Run Evaluation".
-                </td>
-              </tr>
-            `;
-          } else {
-            primaryBody.innerHTML = rowsToRender.map(row => {
-              const isTp = row.configuration === 'TestPilot';
-              const rowClass = isTp
-                ? 'hover:bg-cyan-950/20 bg-cyan-950/10 border-l-2 border-cyan-400 transition'
-                : 'hover:bg-slate-900/50 transition';
-              const nameColor = isTp ? 'text-cyan-400 font-bold' : (row.is_evaluated ? 'text-white font-bold' : 'text-slate-300 font-semibold');
-              const dotColor = isTp ? 'bg-cyan-400 animate-pulse' : (row.is_evaluated ? 'bg-emerald-400' : 'bg-amber-400/80');
-
-              const statusBadge = row.is_evaluated
-                ? `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">✓ Evaluated</span>`
-                : `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950 text-amber-300 border border-amber-800">${escapeHtml(row.status || '◐ Not Evaluated Yet')}</span>`;
-
-              return `
-                <tr class="${rowClass}">
-                  <td class="px-3 py-3 ${nameColor} flex items-center space-x-2">
-                    <span class="w-2 h-2 rounded-full ${dotColor} shrink-0"></span>
-                    <span>${escapeHtml(row.configuration)}</span>
-                  </td>
-                  <td class="px-3 py-3">${statusBadge}</td>
-                  <td class="px-3 py-3 font-mono ${row.is_evaluated ? 'text-slate-200' : 'text-slate-600'}">${escapeHtml(row.selected_tests_display || '—')}</td>
-                  <td class="px-3 py-3 font-mono ${row.is_evaluated ? 'text-slate-300' : 'text-slate-600'}">${escapeHtml(row.ground_truth_positives_display || '—')}</td>
-                  <td class="px-3 py-3 font-mono ${row.is_evaluated ? 'text-emerald-400 font-bold' : 'text-slate-600'}">${escapeHtml(row.tp_display || '—')}</td>
-                  <td class="px-3 py-3 font-mono ${row.is_evaluated ? (row.fp === 0 ? 'text-emerald-400 font-bold' : 'text-rose-400') : 'text-slate-600'}">${escapeHtml(row.fp_display || '—')}</td>
-                  <td class="px-3 py-3 font-mono ${row.is_evaluated ? (row.fn === 0 ? 'text-emerald-400 font-bold' : 'text-yellow-400') : 'text-slate-600'}">${escapeHtml(row.fn_display || '—')}</td>
-                  <td class="px-3 py-3 font-mono ${row.is_evaluated ? (isTp ? 'text-cyan-400 font-bold' : 'text-slate-300') : 'text-slate-600'}">${escapeHtml(row.precision_display || '—')}</td>
-                  <td class="px-3 py-3 font-mono ${row.is_evaluated ? 'text-emerald-400 font-bold' : 'text-slate-600'}">${escapeHtml(row.recall_display || '—')}</td>
-                  <td class="px-3 py-3 font-mono ${row.is_evaluated ? (isTp ? 'text-purple-400 font-bold' : 'text-slate-300') : 'text-slate-600'}">${escapeHtml(row.f1_display || '—')}</td>
-                  <td class="px-3 py-3 font-mono ${row.is_evaluated ? 'text-yellow-400 font-bold' : 'text-slate-600'}">${escapeHtml(row.test_reduction_display || '—')}</td>
-                  <td class="px-3 py-3 text-[11px] font-sans ${row.is_evaluated ? 'text-slate-400' : 'text-slate-500 italic'}">${escapeHtml(row.notes || '')}</td>
-                </tr>
-              `;
-            }).join('');
-          }
-        }
+        cachedEvaluationOverviewData = data;
+        cachedPrimaryMatrixData = data.primary_matrix || [];
+        renderPrimaryEvaluationMatrix(data);
 
         // 4. Update Quantitative Comparison Charts (Measured baselines only)
         if (data.baseline_comparison) {
@@ -7149,45 +7701,70 @@
             const pVal = (tpComp.precision * 100).toFixed(2);
             const el = document.getElementById('eval-chart-prec-testpilot');
             const bar = document.getElementById('eval-bar-prec-testpilot');
+            const cnt = document.getElementById('eval-counts-prec-tp');
             if (el) el.textContent = `${pVal}%`;
             if (bar) bar.style.width = `${Math.min(100, Math.max(2, pVal))}%`;
+            if (cnt && tpComp.tp !== undefined && tpComp.fp !== undefined) {
+              cnt.textContent = `${tpComp.tp} / ${(tpComp.tp + tpComp.fp)}`;
+            }
           }
           if (nvComp?.precision !== undefined && nvComp.precision !== null) {
             const pVal = (nvComp.precision * 100).toFixed(2);
             const el = document.getElementById('eval-chart-prec-naive');
             const bar = document.getElementById('eval-bar-prec-naive');
+            const cnt = document.getElementById('eval-counts-prec-nv');
             if (el) el.textContent = `${pVal}%`;
             if (bar) bar.style.width = `${Math.min(100, Math.max(2, pVal))}%`;
+            if (cnt && nvComp.tp !== undefined && nvComp.fp !== undefined) {
+              cnt.textContent = `${nvComp.tp} / ${(nvComp.tp + nvComp.fp)}`;
+            }
           }
           if (frComp?.precision !== undefined && frComp.precision !== null) {
             const pVal = (frComp.precision * 100).toFixed(2);
             const el = document.getElementById('eval-chart-prec-full');
             const bar = document.getElementById('eval-bar-prec-full');
+            const cnt = document.getElementById('eval-counts-prec-fr');
             if (el) el.textContent = `${pVal}%`;
             if (bar) bar.style.width = '2%';
+            if (cnt && frComp.tp !== undefined && frComp.fp !== undefined) {
+              cnt.textContent = `${frComp.tp} / ${(frComp.tp + frComp.fp).toLocaleString()}`;
+            }
           }
 
           // Recall
+          const totalGt = data.total_ground_truth || 20;
           if (tpComp?.recall !== undefined && tpComp.recall !== null) {
             const rVal = (tpComp.recall * 100).toFixed(2);
             const el = document.getElementById('eval-chart-rec-testpilot');
             const bar = document.getElementById('eval-bar-rec-testpilot');
+            const cnt = document.getElementById('eval-counts-rec-tp');
             if (el) el.textContent = `${rVal}%`;
             if (bar) bar.style.width = `${Math.min(100, Math.max(2, rVal))}%`;
+            if (cnt && tpComp.tp !== undefined) {
+              cnt.textContent = `${tpComp.tp} / ${totalGt} (${Math.round(tpComp.recall * 100)}% of GT)`;
+            }
           }
           if (nvComp?.recall !== undefined && nvComp.recall !== null) {
             const rVal = (nvComp.recall * 100).toFixed(2);
             const el = document.getElementById('eval-chart-rec-naive');
             const bar = document.getElementById('eval-bar-rec-naive');
+            const cnt = document.getElementById('eval-counts-rec-nv');
             if (el) el.textContent = `${rVal}%`;
             if (bar) bar.style.width = `${Math.min(100, Math.max(2, rVal))}%`;
+            if (cnt && nvComp.tp !== undefined) {
+              cnt.textContent = `${nvComp.tp} / ${totalGt} (${Math.round(nvComp.recall * 100)}% of GT)`;
+            }
           }
           if (frComp?.recall !== undefined && frComp.recall !== null) {
             const rVal = (frComp.recall * 100).toFixed(2);
             const el = document.getElementById('eval-chart-rec-full');
             const bar = document.getElementById('eval-bar-rec-full');
+            const cnt = document.getElementById('eval-counts-rec-fr');
             if (el) el.textContent = `${rVal}%`;
             if (bar) bar.style.width = '100%';
+            if (cnt && frComp.tp !== undefined) {
+              cnt.textContent = `${frComp.tp} / ${totalGt} (100% of GT)`;
+            }
           }
 
           // F1-Score
@@ -7214,33 +7791,82 @@
           }
 
           // Test Reduction
+          const totalTests = data.total_benchmarked_tests || 10713;
           if (tpComp?.test_reduction !== undefined && tpComp.test_reduction !== null) {
             const redVal = tpComp.test_reduction.toFixed(2);
             const el = document.getElementById('eval-chart-red-testpilot');
             const bar = document.getElementById('eval-bar-red-testpilot');
+            const cnt = document.getElementById('eval-counts-red-tp');
             if (el) el.textContent = `${redVal}%`;
             if (bar) bar.style.width = `${Math.min(100, Math.max(2, redVal))}%`;
+            if (cnt && tpComp.tests_selected !== undefined) {
+              cnt.textContent = `${tpComp.tests_selected} / ${totalTests.toLocaleString()} tests`;
+            }
           }
           if (nvComp?.test_reduction !== undefined && nvComp.test_reduction !== null) {
             const redVal = nvComp.test_reduction.toFixed(2);
             const el = document.getElementById('eval-chart-red-naive');
             const bar = document.getElementById('eval-bar-red-naive');
+            const cnt = document.getElementById('eval-counts-red-nv');
             if (el) el.textContent = `${redVal}%`;
             if (bar) bar.style.width = `${Math.min(100, Math.max(2, redVal))}%`;
+            if (cnt && nvComp.tests_selected !== undefined) {
+              cnt.textContent = `${nvComp.tests_selected} / ${totalTests.toLocaleString()} tests`;
+            }
           }
           if (frComp?.test_reduction !== undefined && frComp.test_reduction !== null) {
             const redVal = frComp.test_reduction.toFixed(2);
             const el = document.getElementById('eval-chart-red-full');
             const bar = document.getElementById('eval-bar-red-full');
+            const cnt = document.getElementById('eval-counts-red-fr');
             if (el) el.textContent = `${redVal}%`;
             if (bar) bar.style.width = '0%';
+            if (cnt && frComp.tests_selected !== undefined) {
+              cnt.textContent = `${frComp.tests_selected.toLocaleString()} / ${totalTests.toLocaleString()} tests`;
+            }
+          }
+        }
+
+        // 5. Populate Ablation / Experiment Plan Matrix
+        const ablationBody = document.getElementById('eval-ablation-plan-body');
+        if (ablationBody && data.ablation_plan) {
+          if (data.ablation_plan.length === 0) {
+            ablationBody.innerHTML = `<tr><td colspan="8" class="px-4 py-6 text-center text-slate-500 font-sans">No ablation experiments defined.</td></tr>`;
+          } else {
+            ablationBody.innerHTML = data.ablation_plan.map(exp => {
+              const isEval = exp.status === 'Evaluated';
+              const statusBadge = isEval
+                ? `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">✓ Evaluated</span>`
+                : `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950 text-amber-300 border border-amber-800">◐ Pending Ablation</span>`;
+
+              const renderBadge = (val, color) => {
+                const isYes = val === 'Yes' || val === true;
+                return isYes
+                  ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-${color}-950 text-${color}-300 border border-${color}-800">Yes</span>`
+                  : `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-600 bg-slate-950 border border-slate-800">No</span>`;
+              };
+
+              const rowClass = isEval ? 'hover:bg-slate-900/50 transition' : 'hover:bg-slate-900/30 opacity-80 transition';
+              return `
+                <tr class="${rowClass}">
+                  <td class="px-3 py-3 font-bold text-white flex items-center space-x-2">
+                    <span class="w-2 h-2 rounded-full ${isEval ? 'bg-emerald-400' : 'bg-amber-400/80'} shrink-0"></span>
+                    <span>${escapeHtml(exp.experiment)}</span>
+                  </td>
+                  <td class="px-3 py-3 text-slate-300 text-[11px] font-sans max-w-xs">${escapeHtml(exp.purpose || '')}</td>
+                  <td class="px-3 py-3">${renderBadge(exp.deterministic_repo_intelligence, 'emerald')}</td>
+                  <td class="px-3 py-3">${renderBadge(exp.sourcegraph, 'cyan')}</td>
+                  <td class="px-3 py-3">${renderBadge(exp.repository_rag, 'purple')}</td>
+                  <td class="px-3 py-3">${renderBadge(exp.codellama_validation, 'indigo')}</td>
+                  <td class="px-3 py-3">${statusBadge}</td>
+                  <td class="px-3 py-3 text-[11px] font-mono ${isEval ? 'text-cyan-300 font-semibold' : 'text-slate-500 italic'}">${escapeHtml(exp.metrics || '—')}</td>
+                </tr>
+              `;
+            }).join('');
           }
         }
 
 
-
-        await fetchQualitativeFindings();
-        populateQualitativeRepoFilter();
 
         if (window.lucide && window.lucide.createIcons) {
           window.lucide.createIcons();
@@ -7449,318 +8075,6 @@
         if (btn) btn.disabled = false;
         if (text) text.textContent = 'Re-run Benchmark Suite';
       }
-    }
-
-    // =========================================================================
-    // QUALITATIVE ANALYSIS FINDINGS & QUANTITATIVE MATRIX CONTROLS
-    // =========================================================================
-
-    let cachedQuantitativeQuestions = null;
-    let selectedMatrixCategory = 'all';
-
-    function populateQualitativeRepoFilter() {
-      const select = document.getElementById('qualitative-repo-filter');
-      if (!select) return;
-      const currentVal = select.value;
-      let html = '<option value="all">All Evaluated Repositories</option>';
-      if (typeof cachedCustomRepos !== 'undefined' && Array.isArray(cachedCustomRepos) && cachedCustomRepos.length > 0) {
-        cachedCustomRepos.forEach(r => {
-          html += `<option value="${escapeHtml(r.repo_id)}">${escapeHtml(r.name)} (${escapeHtml(r.repo_id)})</option>`;
-        });
-      }
-      select.innerHTML = html;
-      if (currentVal) select.value = currentVal;
-    }
-
-    async function fetchQualitativeFindings(repoId) {
-      const container = document.getElementById('qualitative-findings-container');
-      if (!container) return;
-
-      if (repoId === undefined) {
-        const select = document.getElementById('qualitative-repo-filter');
-        repoId = select ? select.value : 'all';
-      }
-
-      container.innerHTML = `
-        <div class="p-6 rounded-xl bg-slate-950/60 border border-slate-800 text-center text-slate-400 text-xs">
-          <i data-lucide="loader" class="w-5 h-5 animate-spin mx-auto text-cyan-400 mb-2"></i>
-          <span>Loading qualitative findings and empirical evidence...</span>
-        </div>
-      `;
-      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
-
-      try {
-        const url = (repoId && repoId !== 'all')
-          ? `/api/evaluation/qualitative-findings?repo_id=${encodeURIComponent(repoId)}`
-          : '/api/evaluation/qualitative-findings';
-
-        const res = await fetch(url);
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Server returned ${res.status}`);
-        }
-        const data = await res.json();
-        renderQualitativeFindings(data);
-      } catch (err) {
-        container.innerHTML = `
-          <div class="p-4 rounded-xl bg-rose-950/40 border border-rose-800 text-rose-300 text-xs">
-            <strong>Error loading qualitative findings:</strong> ${escapeHtml(err.message)}
-          </div>
-        `;
-      }
-    }
-
-    function renderQualitativeFindings(data) {
-      const container = document.getElementById('qualitative-findings-container');
-      if (!container) return;
-
-      const findings = data.findings || [];
-
-      // Update summary counts
-      const evidenceCount = findings.filter(f => f.status === 'evidence_supported').length;
-      const preliminaryCount = findings.filter(f => f.status === 'preliminary').length;
-      const insufficientCount = findings.filter(f => f.status === 'insufficient_evidence').length;
-
-      const bEvidence = document.getElementById('qualitative-badge-evidence');
-      const bPreliminary = document.getElementById('qualitative-badge-preliminary');
-      const bInsufficient = document.getElementById('qualitative-badge-insufficient');
-
-      if (bEvidence) bEvidence.textContent = evidenceCount;
-      if (bPreliminary) bPreliminary.textContent = preliminaryCount;
-      if (bInsufficient) bInsufficient.textContent = insufficientCount;
-
-      let html = '';
-
-      // If repository has insufficient evidence, display a clear warning banner first
-      if (data.has_sufficient_evidence === false || (findings.length > 0 && insufficientCount === findings.length)) {
-        html += `
-          <div class="p-4 rounded-xl bg-amber-950/40 border border-amber-800 text-amber-200 text-xs flex items-start space-x-3 mb-4">
-            <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-400 shrink-0 mt-0.5"></i>
-            <div class="space-y-1">
-              <div class="font-bold text-amber-300">Insufficient Validated Evaluation Evidence</div>
-              <p class="text-[11px] text-amber-200/90 leading-relaxed">
-                Insufficient validated evaluation evidence to establish this finding. Run eligible benchmarks and validate the relevant ground-truth cases.
-              </p>
-            </div>
-          </div>
-        `;
-      }
-
-      // Render cards for each finding
-      html += findings.map(f => {
-        let statusBadge = '';
-        if (f.status === 'evidence_supported') {
-          statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">Evidence Supported</span>';
-        } else if (f.status === 'preliminary') {
-          statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950 text-amber-300 border border-amber-800">Preliminary</span>';
-        } else {
-          statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-900 text-slate-400 border border-slate-700">Insufficient Evidence</span>';
-        }
-
-        let confBadge = '';
-        if (f.confidence === 'high') {
-          confBadge = '<span class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-950/70 text-emerald-400 border border-emerald-900">Confidence: High</span>';
-        } else if (f.confidence === 'medium') {
-          confBadge = '<span class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-950/70 text-amber-400 border border-amber-900">Confidence: Medium</span>';
-        } else {
-          confBadge = '<span class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-900 text-slate-400 border border-slate-800">Confidence: Low</span>';
-        }
-
-        return `
-          <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3 hover:border-slate-700/80 transition">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-900 pb-2.5">
-              <div class="flex items-center space-x-2">
-                <span class="font-mono text-xs text-cyan-400 font-bold">${escapeHtml(f.finding_id)}</span>
-                <span class="text-slate-600 font-mono">•</span>
-                <span class="text-xs font-semibold text-white">${escapeHtml(f.title)}</span>
-              </div>
-              <div class="flex items-center space-x-1.5">
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">${escapeHtml(f.category)}</span>
-                ${statusBadge}
-                ${confBadge}
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-              <div class="space-y-1 p-2.5 rounded-lg bg-slate-900/60 border border-slate-850">
-                <div class="font-bold text-slate-300 flex items-center space-x-1.5">
-                  <i data-lucide="eye" class="w-3.5 h-3.5 text-cyan-400"></i>
-                  <span>Direct Observation</span>
-                </div>
-                <p class="text-[11px] text-slate-300 leading-relaxed">${escapeHtml(f.observation)}</p>
-              </div>
-
-              <div class="space-y-1 p-2.5 rounded-lg bg-slate-900/60 border border-slate-850">
-                <div class="font-bold text-slate-300 flex items-center space-x-1.5">
-                  <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
-                  <span>Supporting Evidence</span>
-                </div>
-                <p class="text-[11px] text-emerald-300/90 font-mono leading-relaxed">${escapeHtml(f.supporting_evidence)}</p>
-              </div>
-
-              <div class="space-y-1 p-2.5 rounded-lg bg-slate-900/60 border border-slate-850">
-                <div class="font-bold text-slate-300 flex items-center space-x-1.5">
-                  <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-400"></i>
-                  <span>Architectural Interpretation</span>
-                </div>
-                <p class="text-[11px] text-slate-300 leading-relaxed">${escapeHtml(f.interpretation)}</p>
-              </div>
-
-              <div class="space-y-1 p-2.5 rounded-lg bg-slate-900/60 border border-slate-850">
-                <div class="font-bold text-slate-300 flex items-center space-x-1.5">
-                  <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-purple-400"></i>
-                  <span>Limitations & Scope</span>
-                </div>
-                <p class="text-[11px] text-slate-400 leading-relaxed">${escapeHtml(f.limitations)}</p>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      container.innerHTML = html;
-      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
-    }
-
-    // Modal 8: Quantitative Matrix Inspector
-    async function openQuantitativeMatrixModal(categoryFilter) {
-      const modal = document.getElementById('modal-quantitative-questions');
-      if (!modal) return;
-      modal.classList.remove('hidden');
-
-      if (!cachedQuantitativeQuestions) {
-        try {
-          const res = await fetch('/api/evaluation/quantitative-questions');
-          cachedQuantitativeQuestions = await res.json();
-        } catch (err) {
-          console.error('Failed to load quantitative questions:', err);
-          return;
-        }
-      }
-
-      if (categoryFilter) {
-        selectedMatrixCategory = categoryFilter;
-      } else {
-        selectedMatrixCategory = 'all';
-      }
-
-      renderQuantitativeQuestions();
-      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
-    }
-
-    function closeQuantitativeMatrixModal() {
-      const modal = document.getElementById('modal-quantitative-questions');
-      if (modal) modal.classList.add('hidden');
-    }
-
-    function setMatrixCategoryFilter(category) {
-      selectedMatrixCategory = category;
-      renderQuantitativeQuestions();
-    }
-
-    function renderQuantitativeQuestions() {
-      if (!cachedQuantitativeQuestions) return;
-      const container = document.getElementById('modal-quantitative-questions-list');
-      const searchInput = document.getElementById('modal-quantitative-search');
-      const query = (searchInput ? searchInput.value.trim().toLowerCase() : '');
-
-      let list = cachedQuantitativeQuestions.questions || [];
-      if (selectedMatrixCategory !== 'all') {
-        list = list.filter(q => q.category.toLowerCase().includes(selectedMatrixCategory.toLowerCase()) || q.category === selectedMatrixCategory);
-      }
-      if (query) {
-        list = list.filter(q =>
-          q.id.toLowerCase().includes(query) ||
-          q.question.toLowerCase().includes(query) ||
-          q.objective.toLowerCase().includes(query) ||
-          (q.formula && q.formula.toLowerCase().includes(query))
-        );
-      }
-
-      // Update category pill active styles
-      document.querySelectorAll('.matrix-cat-pill').forEach(btn => {
-        const cat = btn.getAttribute('data-category');
-        if (cat === selectedMatrixCategory) {
-          btn.className = 'matrix-cat-pill px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-600 text-white shadow transition cursor-pointer';
-        } else {
-          btn.className = 'matrix-cat-pill px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition cursor-pointer';
-        }
-      });
-
-      const countEl = document.getElementById('modal-matrix-filtered-count');
-      if (countEl) countEl.textContent = `${list.length} of ${cachedQuantitativeQuestions.total_questions} Questions`;
-
-      if (list.length === 0) {
-        container.innerHTML = `
-          <div class="p-8 text-center text-slate-500 text-xs font-mono">
-            No quantitative evaluation questions match the selected category or search filter.
-          </div>
-        `;
-        return;
-      }
-
-      container.innerHTML = list.map(q => {
-        const metricsHtml = (q.metrics || []).map(m => `
-          <div class="p-2 rounded bg-slate-900 border border-slate-850 space-y-1">
-            <div class="flex items-center justify-between text-[11px]">
-              <span class="font-bold text-slate-200">${escapeHtml(m.name)}</span>
-              <span class="font-mono text-[10px] text-purple-300">${escapeHtml(m.unit)}</span>
-            </div>
-            <div class="text-[10px] text-slate-400">${escapeHtml(m.definition)}</div>
-            <div class="font-mono text-[10px] text-cyan-400 bg-slate-950 px-1.5 py-0.5 rounded">${escapeHtml(m.formula || 'No closed-form mathematical formula (Qualitative/Empirical)')}</div>
-          </div>
-        `).join('');
-
-        return `
-          <div class="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-3 font-sans">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-900 pb-2">
-              <div class="flex items-center space-x-2">
-                <span class="px-2 py-0.5 rounded font-mono font-bold text-xs bg-purple-950 text-purple-300 border border-purple-800">${escapeHtml(q.id)}</span>
-                <span class="text-xs font-bold text-white">${escapeHtml(q.question)}</span>
-              </div>
-              <div class="flex items-center space-x-2">
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">${escapeHtml(q.category)}</span>
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-500 border border-slate-800">Status: ${escapeHtml(q.status)}</span>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-              <div class="space-y-1">
-                <div class="font-bold text-slate-300">Objective</div>
-                <p class="text-[11px] text-slate-400 leading-relaxed">${escapeHtml(q.objective)}</p>
-              </div>
-
-              <div class="space-y-1">
-                <div class="font-bold text-slate-300">Formula & Primary Unit</div>
-                <div class="font-mono text-[11px] text-cyan-300 bg-slate-900/80 p-2 rounded border border-slate-850">
-                  ${escapeHtml(q.formula || 'null (No subjective or fabricated formula)')}
-                </div>
-                <div class="text-[10px] text-slate-500 font-mono">Unit: ${escapeHtml(q.unit)} | Aggregation: ${escapeHtml(q.aggregation)}</div>
-              </div>
-            </div>
-
-            <div class="space-y-1.5">
-              <div class="font-bold text-slate-300 text-xs">Metric Specifications (${(q.metrics || []).length})</div>
-              <div class="grid grid-cols-1 md:grid-cols-${Math.min((q.metrics || []).length, 3)} gap-2">
-                ${metricsHtml}
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] pt-1 border-t border-slate-900">
-              <div class="space-y-0.5">
-                <span class="font-bold text-slate-400">Methodology:</span>
-                <p class="text-slate-400">${escapeHtml(q.methodology)}</p>
-              </div>
-              <div class="space-y-0.5">
-                <span class="font-bold text-slate-400">Answerability Requirements:</span>
-                <p class="text-amber-300/80 font-mono text-[10px]">${escapeHtml(q.answerability_requirements)}</p>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
     }
   </script>
 
@@ -8227,69 +8541,5 @@
       </div>
     </div>
   </div>
-
-  <!-- Modal 8: Quantitative Matrix Inspector Modal -->
-  <div id="modal-quantitative-questions" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-      <!-- Modal Header -->
-      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
-        <div>
-          <div class="flex items-center space-x-2.5">
-            <span class="px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">Formal Specification</span>
-            <h3 class="text-base font-bold text-white">Quantitative Analysis — 30-Question Matrix</h3>
-            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700">Q01–Q30</span>
-          </div>
-          <p class="text-xs text-slate-400 mt-1">
-            Exact metric formulas, required input data, comparison baselines, and answerability criteria across 7 research categories.
-          </p>
-        </div>
-        <div class="flex items-center space-x-2">
-          <a href="/api/evaluation/quantitative-questions" target="_blank" download="quantitative_evaluation_questions.json" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center space-x-1.5 cursor-pointer">
-            <i data-lucide="download" class="w-3.5 h-3.5"></i>
-            <span>Raw JSON</span>
-          </a>
-          <button onclick="closeQuantitativeMatrixModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer">
-            <i data-lucide="x" class="w-5 h-5"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- Filter Bar -->
-      <div class="px-6 py-3 border-b border-slate-800 bg-slate-900/60 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div class="flex items-center space-x-1.5 overflow-x-auto py-1" id="matrix-category-filter-buttons">
-          <button onclick="setMatrixCategoryFilter('ALL')" class="matrix-filter-btn px-2.5 py-1 rounded font-mono text-[11px] font-semibold bg-indigo-600 text-white cursor-pointer" data-cat="ALL">All (30)</button>
-          <button onclick="setMatrixCategoryFilter('Category A — Test Selection Quality')" class="matrix-filter-btn px-2.5 py-1 rounded font-mono text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer" data-cat="Category A — Test Selection Quality">Cat A (6)</button>
-          <button onclick="setMatrixCategoryFilter('Category B — Dependency and Impact Analysis')" class="matrix-filter-btn px-2.5 py-1 rounded font-mono text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer" data-cat="Category B — Dependency and Impact Analysis">Cat B (6)</button>
-          <button onclick="setMatrixCategoryFilter('Category C — Repository RAG and Evidence Retrieval')" class="matrix-filter-btn px-2.5 py-1 rounded font-mono text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer" data-cat="Category C — Repository RAG and Evidence Retrieval">Cat C (6)</button>
-          <button onclick="setMatrixCategoryFilter('Category D — Test Generation and Ground Truth')" class="matrix-filter-btn px-2.5 py-1 rounded font-mono text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer" data-cat="Category D — Test Generation and Ground Truth">Cat D (4)</button>
-          <button onclick="setMatrixCategoryFilter('Category E — Performance and Scalability')" class="matrix-filter-btn px-2.5 py-1 rounded font-mono text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer" data-cat="Category E — Performance and Scalability">Cat E (3)</button>
-          <button onclick="setMatrixCategoryFilter('Category F — Reliability and Generalization')" class="matrix-filter-btn px-2.5 py-1 rounded font-mono text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer" data-cat="Category F — Reliability and Generalization">Cat F (3)</button>
-          <button onclick="setMatrixCategoryFilter('Category G — Evaluation Validity and Usability')" class="matrix-filter-btn px-2.5 py-1 rounded font-mono text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer" data-cat="Category G — Evaluation Validity and Usability">Cat G (2)</button>
-        </div>
-        <div class="relative w-64">
-          <input type="text" id="matrix-search-input" oninput="filterQuantitativeQuestionsSearch(this.value)" placeholder="Search questions, metrics, formulas..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono">
-        </div>
-      </div>
-
-      <!-- Modal Body (Scrollable Questions List) -->
-      <div id="matrix-questions-container" class="flex-1 overflow-y-auto p-6 space-y-4">
-        <!-- Questions injected dynamically -->
-        <div class="text-center py-12 text-slate-500 font-mono text-xs">
-          Loading 30 quantitative evaluation questions...
-        </div>
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="px-6 py-3 border-t border-slate-800 bg-slate-950/70 flex items-center justify-between text-xs text-slate-500">
-        <div class="font-mono text-[11px]">
-          Status of all questions initialized to <span class="text-slate-400 font-semibold">not_measured</span> (no unsupported or fabricated conclusions).
-        </div>
-        <button onclick="closeQuantitativeMatrixModal()" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 transition cursor-pointer">
-          Close Inspector
-        </button>
-      </div>
-    </div>
-  </div>
 </body>
-
 </html>
